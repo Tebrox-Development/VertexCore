@@ -1,14 +1,15 @@
 package de.tebrox.vertexCore.database;
 
-import de.tebrox.vertexCore.database.DataObject;
-import de.tebrox.vertexCore.database.DatabaseSettings;
 import de.tebrox.vertexCore.VertexCoreApi;
 import de.tebrox.vertexCore.database.internal.TableNamer;
 import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -26,9 +27,16 @@ public final class Database<T extends DataObject> implements AutoCloseable {
         this.table = TableNamer.tableName(settings.tablePrefix(), type);
     }
 
+    /**
+     * Blocking compatibility API. The write still goes through the tracked
+     * per-key lane and waits for the actual write/reconciliation task rather
+     * than a caller timeout view.
+     */
     public void saveObject(T obj) {
-        String json = VertexCoreApi.get().json().toJson(type, obj);
-        VertexCoreApi.get().backendFor(owner, settings).set(table, obj.getUniqueId(), json);
+        DatabaseWriteResult result = saveObjectTrackedAsync(obj).completion().join();
+        if (result.status() != DatabaseWriteResult.Status.COMMITTED) {
+            throw new DatabaseWriteException(result);
+        }
     }
 
     public T loadObject(String uniqueId) {
@@ -61,7 +69,36 @@ public final class Database<T extends DataObject> implements AutoCloseable {
         return out;
     }
 
-    // ---------------- async core: CompletableFuture ----------------
+    public DatabaseWriteOperation saveObjectTrackedAsync(T obj) {
+        UUID operationId = UUID.randomUUID();
+
+        final String json;
+        try {
+            json = VertexCoreApi.get().json().toJson(type, obj);
+        } catch (RuntimeException ex) {
+            return DatabaseWriteOperation.completed(
+                    DatabaseWriteResult.notCommitted(operationId, ex)
+            );
+        }
+
+        return VertexCoreApi.get().databaseService().submitTrackedWrite(
+                owner,
+                settings,
+                table,
+                obj.getUniqueId(),
+                json,
+                operationId
+        );
+    }
+
+    public CompletableFuture<DatabaseReconciliationResult> reconcileObjectAsync(String uniqueId) {
+        return VertexCoreApi.get().databaseService().reconcileTrackedWrite(
+                owner,
+                settings,
+                table,
+                uniqueId
+        );
+    }
 
     public CompletableFuture<T> loadObjectAsync(String uniqueId) {
         if (settings.useQueue()) {
@@ -69,18 +106,18 @@ public final class Database<T extends DataObject> implements AutoCloseable {
                     .queueFor(owner, settings.timeoutMillis())
                     .submit(() -> loadObject(uniqueId));
         }
-        return CompletableFuture.supplyAsync(() -> loadObject(uniqueId), VertexCoreApi.get().asyncExecutor())
-                .orTimeout(settings.timeoutMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+        return timeoutView(
+                CompletableFuture.supplyAsync(() -> loadObject(uniqueId), VertexCoreApi.get().asyncExecutor())
+        );
     }
 
     public CompletableFuture<Void> saveObjectAsync(T obj) {
-        if (settings.useQueue()) {
-            return VertexCoreApi.get().databaseService()
-                    .queueFor(owner, settings.timeoutMillis())
-                    .submitVoid(() -> saveObject(obj));
-        }
-        CompletableFuture<Void> f = CompletableFuture.runAsync(() -> saveObject(obj), VertexCoreApi.get().asyncExecutor());
-        return settings.timeoutMillis() > 0 ? f.orTimeout(settings.timeoutMillis(), java.util.concurrent.TimeUnit.MILLISECONDS) : f;
+        return saveObjectTrackedAsync(obj).result().thenCompose(result -> {
+            if (result.status() == DatabaseWriteResult.Status.COMMITTED) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return CompletableFuture.failedFuture(new DatabaseWriteException(result));
+        });
     }
 
     public CompletableFuture<List<T>> loadObjectsAsync() {
@@ -89,8 +126,9 @@ public final class Database<T extends DataObject> implements AutoCloseable {
                     .queueFor(owner, settings.timeoutMillis())
                     .submit(this::loadObjects);
         }
-        CompletableFuture<List<T>> f = CompletableFuture.supplyAsync(this::loadObjects, VertexCoreApi.get().asyncExecutor());
-        return settings.timeoutMillis() > 0 ? f.orTimeout(settings.timeoutMillis(), java.util.concurrent.TimeUnit.MILLISECONDS) : f;
+        return timeoutView(
+                CompletableFuture.supplyAsync(this::loadObjects, VertexCoreApi.get().asyncExecutor())
+        );
     }
 
     public CompletableFuture<Void> deleteObjectAsync(String uniqueId) {
@@ -99,12 +137,10 @@ public final class Database<T extends DataObject> implements AutoCloseable {
                     .queueFor(owner, settings.timeoutMillis())
                     .submitVoid(() -> deleteObject(uniqueId));
         }
-        CompletableFuture<Void> f = CompletableFuture.runAsync(() -> deleteObject(uniqueId), VertexCoreApi.get().asyncExecutor());
-        return settings.timeoutMillis() > 0 ? f.orTimeout(settings.timeoutMillis(), java.util.concurrent.TimeUnit.MILLISECONDS) : f;
+        return timeoutView(
+                CompletableFuture.runAsync(() -> deleteObject(uniqueId), VertexCoreApi.get().asyncExecutor())
+        );
     }
-
-
-    // ---------------- convenience: deliver result on main thread ----------------
 
     public void loadObjectAsyncMain(String uniqueId, Consumer<T> onSuccess, Consumer<Throwable> onError) {
         loadObjectAsync(uniqueId).whenComplete((result, err) ->
@@ -133,12 +169,34 @@ public final class Database<T extends DataObject> implements AutoCloseable {
         );
     }
 
-    // Optional: generic helper
     public <R> void supplyAsyncMain(CompletableFuture<R> future, BiConsumer<R, Throwable> callbackOnMain) {
         future.whenComplete((r, err) ->
                 CompletableFuture.runAsync(() -> callbackOnMain.accept(r, err == null ? null : unwrap(err)),
                         VertexCoreApi.get().mainExecutor())
         );
+    }
+
+    private <R> CompletableFuture<R> timeoutView(CompletableFuture<R> completion) {
+        if (settings.timeoutMillis() <= 0) {
+            return completion;
+        }
+
+        CompletableFuture<R> callerView = new CompletableFuture<>();
+        completion.whenComplete((result, error) -> {
+            if (error != null) {
+                callerView.completeExceptionally(error);
+            } else {
+                callerView.complete(result);
+            }
+        });
+
+        CompletableFuture.delayedExecutor(settings.timeoutMillis(), TimeUnit.MILLISECONDS).execute(() ->
+                callerView.completeExceptionally(new TimeoutException(
+                        "Database operation timed out after " + settings.timeoutMillis() + " ms"
+                ))
+        );
+
+        return callerView;
     }
 
     private static Throwable unwrap(Throwable t) {
@@ -149,7 +207,6 @@ public final class Database<T extends DataObject> implements AutoCloseable {
 
     @Override
     public void close() {
-        // optional: pool für das plugin schließen
         VertexCoreApi.get().closeFor(owner);
     }
 }

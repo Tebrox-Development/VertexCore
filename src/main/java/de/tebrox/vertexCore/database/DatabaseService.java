@@ -11,8 +11,12 @@ import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 public class DatabaseService implements Listener {
     private final Plugin core;
@@ -21,6 +25,9 @@ public class DatabaseService implements Listener {
 
     private final Map<String, DatabaseBackend> backends = new ConcurrentHashMap<>();
     private final Map<String, AsyncQueue> queues = new ConcurrentHashMap<>();
+
+    private final Map<WriteKey, WriteLane> writeLanes = new ConcurrentHashMap<>();
+    private final Map<WriteKey, UUID> unresolvedWrites = new ConcurrentHashMap<>();
 
     public DatabaseService(Plugin core, PluginDataRegistry registry) {
         this.core = core;
@@ -38,8 +45,8 @@ public class DatabaseService implements Listener {
         return backends.computeIfAbsent(fp, k -> {
             return switch (settings.backend().toLowerCase()) {
                 case "json" -> FlatfileDatabaseBackend.start(owner);
-                case "h2" -> new JdbcDatabaseBackend(JdbcDatabaseBackend.createDataSource(owner, settings), /*dialect*/ "h2");
-                case "mysql" -> new JdbcDatabaseBackend(JdbcDatabaseBackend.createDataSource(owner, settings), /*dialect*/ "mysql");
+                case "h2" -> new JdbcDatabaseBackend(JdbcDatabaseBackend.createDataSource(owner, settings), "h2");
+                case "mysql" -> new JdbcDatabaseBackend(JdbcDatabaseBackend.createDataSource(owner, settings), "mysql");
                 default -> throw new IllegalArgumentException("Unknown backend: " + settings.backend());
             };
         });
@@ -48,6 +55,73 @@ public class DatabaseService implements Listener {
     public AsyncQueue queueFor(Plugin owner, long timeoutMillis) {
         String key = owner.getName().toLowerCase();
         return queues.computeIfAbsent(key, k -> new AsyncQueue(r -> Bukkit.getScheduler().runTaskAsynchronously(core, r), timeoutMillis));
+    }
+
+    public DatabaseWriteOperation submitTrackedWrite(
+            Plugin owner,
+            DatabaseSettings settings,
+            String table,
+            String uniqueId,
+            String json,
+            UUID operationId
+    ) {
+        WriteKey key = new WriteKey(fingerprint(owner, settings), table, uniqueId);
+
+        CompletableFuture<DatabaseWriteResult> completion = enqueue(
+                key,
+                owner,
+                settings,
+                () -> performTrackedWrite(key, owner, settings, table, uniqueId, json, operationId)
+        );
+
+        CompletableFuture<DatabaseWriteResult> callerView = writeTimeoutView(
+                completion,
+                operationId,
+                settings.timeoutMillis()
+        );
+
+        return new DatabaseWriteOperation(operationId, callerView, completion);
+    }
+
+    public CompletableFuture<DatabaseReconciliationResult> reconcileTrackedWrite(
+            Plugin owner,
+            DatabaseSettings settings,
+            String table,
+            String uniqueId
+    ) {
+        WriteKey key = new WriteKey(fingerprint(owner, settings), table, uniqueId);
+
+        CompletableFuture<DatabaseReconciliationResult> completion = enqueue(
+                key,
+                owner,
+                settings,
+                () -> performReconciliation(key, owner, settings, table, uniqueId)
+        );
+
+        if (settings.timeoutMillis() <= 0) {
+            return completion;
+        }
+
+        CompletableFuture<DatabaseReconciliationResult> callerView = new CompletableFuture<>();
+        completion.whenComplete((result, error) -> {
+            if (error != null) {
+                callerView.completeExceptionally(error);
+            } else {
+                callerView.complete(result);
+            }
+        });
+
+        CompletableFuture.delayedExecutor(settings.timeoutMillis(), TimeUnit.MILLISECONDS).execute(() -> {
+            UUID pending = unresolvedWrites.get(key);
+            callerView.complete(DatabaseReconciliationResult.stillUnknown(
+                    pending,
+                    new TimeoutException(
+                            "Database reconciliation timed out after " + settings.timeoutMillis() + " ms"
+                    )
+            ));
+        });
+
+        return callerView;
     }
 
     public void closeFor(Plugin owner) {
@@ -97,6 +171,181 @@ public class DatabaseService implements Listener {
     public void closeAll() {
         backends.values().forEach(DatabaseBackend::close);
         backends.clear();
+        queues.clear();
+        unresolvedWrites.clear();
+        writeLanes.clear();
+    }
+
+    private DatabaseWriteResult performTrackedWrite(
+            WriteKey key,
+            Plugin owner,
+            DatabaseSettings settings,
+            String table,
+            String uniqueId,
+            String json,
+            UUID operationId
+    ) {
+        final DatabaseBackend backend;
+        try {
+            backend = backendFor(owner, settings);
+        } catch (RuntimeException ex) {
+            return DatabaseWriteResult.notCommitted(operationId, ex);
+        }
+
+        UUID unresolvedOperation = unresolvedWrites.get(key);
+        if (unresolvedOperation != null) {
+            DatabaseWriteResult previous = safeReconcile(
+                    backend,
+                    table,
+                    uniqueId,
+                    unresolvedOperation
+            );
+
+            if (previous.status() == DatabaseWriteResult.Status.UNKNOWN) {
+                return DatabaseWriteResult.notCommitted(
+                        operationId,
+                        new IllegalStateException(
+                                "Previous write " + unresolvedOperation
+                                        + " is still unresolved; new write was not started",
+                                previous.cause()
+                        )
+                );
+            }
+
+            unresolvedWrites.remove(key, unresolvedOperation);
+        }
+
+        DatabaseWriteResult result;
+        try {
+            result = backend.writeTracked(table, uniqueId, json, operationId);
+        } catch (RuntimeException ex) {
+            result = DatabaseWriteResult.unknown(operationId, ex);
+        }
+
+        if (result.status() == DatabaseWriteResult.Status.UNKNOWN) {
+            unresolvedWrites.put(key, operationId);
+        }
+
+        return result;
+    }
+
+    private DatabaseReconciliationResult performReconciliation(
+            WriteKey key,
+            Plugin owner,
+            DatabaseSettings settings,
+            String table,
+            String uniqueId
+    ) {
+        UUID unresolvedOperation = unresolvedWrites.get(key);
+        if (unresolvedOperation == null) {
+            return DatabaseReconciliationResult.noPendingWrite();
+        }
+
+        final DatabaseBackend backend;
+        try {
+            backend = backendFor(owner, settings);
+        } catch (RuntimeException ex) {
+            return DatabaseReconciliationResult.stillUnknown(unresolvedOperation, ex);
+        }
+
+        DatabaseWriteResult result = safeReconcile(
+                backend,
+                table,
+                uniqueId,
+                unresolvedOperation
+        );
+
+        if (result.status() == DatabaseWriteResult.Status.UNKNOWN) {
+            return DatabaseReconciliationResult.stillUnknown(unresolvedOperation, result.cause());
+        }
+
+        unresolvedWrites.remove(key, unresolvedOperation);
+        return DatabaseReconciliationResult.reconciled(result);
+    }
+
+    private DatabaseWriteResult safeReconcile(
+            DatabaseBackend backend,
+            String table,
+            String uniqueId,
+            UUID operationId
+    ) {
+        try {
+            return backend.reconcileTrackedWrite(table, uniqueId, operationId);
+        } catch (RuntimeException ex) {
+            return DatabaseWriteResult.unknown(operationId, ex);
+        }
+    }
+
+    private <T> CompletableFuture<T> enqueue(
+            WriteKey key,
+            Plugin owner,
+            DatabaseSettings settings,
+            Supplier<T> task
+    ) {
+        WriteLane lane = writeLanes.computeIfAbsent(key, ignored -> new WriteLane());
+
+        CompletableFuture<T> next;
+        CompletableFuture<Void> newTail;
+
+        synchronized (lane) {
+            next = lane.tail.thenCompose(ignored -> submitRaw(owner, settings, task));
+            newTail = next.handle((result, error) -> null);
+            lane.tail = newTail;
+        }
+
+        CompletableFuture<Void> expectedTail = newTail;
+        newTail.whenComplete((ignored, error) -> {
+            synchronized (lane) {
+                if (lane.tail == expectedTail && !unresolvedWrites.containsKey(key)) {
+                    writeLanes.remove(key, lane);
+                }
+            }
+        });
+
+        return next;
+    }
+
+    private <T> CompletableFuture<T> submitRaw(
+            Plugin owner,
+            DatabaseSettings settings,
+            Supplier<T> task
+    ) {
+        if (settings.useQueue()) {
+            return queueFor(owner, settings.timeoutMillis()).submitRaw(task);
+        }
+
+        return CompletableFuture.supplyAsync(
+                task,
+                runnable -> Bukkit.getScheduler().runTaskAsynchronously(core, runnable)
+        );
+    }
+
+    private static CompletableFuture<DatabaseWriteResult> writeTimeoutView(
+            CompletableFuture<DatabaseWriteResult> completion,
+            UUID operationId,
+            long timeoutMillis
+    ) {
+        if (timeoutMillis <= 0) {
+            return completion;
+        }
+
+        CompletableFuture<DatabaseWriteResult> callerView = new CompletableFuture<>();
+        completion.whenComplete((result, error) -> {
+            if (error != null) {
+                callerView.completeExceptionally(error);
+            } else {
+                callerView.complete(result);
+            }
+        });
+
+        CompletableFuture.delayedExecutor(timeoutMillis, TimeUnit.MILLISECONDS).execute(() ->
+                callerView.complete(DatabaseWriteResult.unknown(
+                        operationId,
+                        new TimeoutException("Database write timed out after " + timeoutMillis + " ms")
+                ))
+        );
+
+        return callerView;
     }
 
     private static Throwable unwrap(Throwable t) {
@@ -115,4 +364,9 @@ public class DatabaseService implements Listener {
         return base;
     }
 
+    private record WriteKey(String backendFingerprint, String table, String uniqueId) {}
+
+    private static final class WriteLane {
+        private CompletableFuture<Void> tail = CompletableFuture.completedFuture(null);
+    }
 }

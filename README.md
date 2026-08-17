@@ -44,7 +44,7 @@ reducing duplicated boilerplate across multiple plugins.
 ## Requirements
 
 - Paper 1.21+
-- Java 17+
+- Java 21+
 
 ---
 
