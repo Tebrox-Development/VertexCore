@@ -235,30 +235,34 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
     }
 
     private static String encodeId(String id) {
-        byte[] bytes = id.getBytes(StandardCharsets.UTF_8);
-        StringBuilder encoded = new StringBuilder(bytes.length * 2);
-        for (byte value : bytes) {
-            int unsigned = value & 0xff;
-            encoded.append(Character.forDigit(unsigned >>> 4, 16));
-            encoded.append(Character.forDigit(unsigned & 0x0f, 16));
+        StringBuilder encoded = new StringBuilder(id.length() * 4);
+        for (int i = 0; i < id.length(); i++) {
+            int value = id.charAt(i);
+            encoded.append(Character.forDigit((value >>> 12) & 0x0f, 16));
+            encoded.append(Character.forDigit((value >>> 8) & 0x0f, 16));
+            encoded.append(Character.forDigit((value >>> 4) & 0x0f, 16));
+            encoded.append(Character.forDigit(value & 0x0f, 16));
         }
         return encoded.toString();
     }
 
     private static String decodeId(String encoded) {
-        if ((encoded.length() & 1) != 0) {
+        if ((encoded.length() & 3) != 0) {
             throw new IllegalArgumentException("Invalid encoded flatfile id");
         }
-        byte[] bytes = new byte[encoded.length() / 2];
-        for (int i = 0; i < encoded.length(); i += 2) {
-            int high = Character.digit(encoded.charAt(i), 16);
-            int low = Character.digit(encoded.charAt(i + 1), 16);
-            if (high < 0 || low < 0) {
-                throw new IllegalArgumentException("Invalid encoded flatfile id");
+        char[] chars = new char[encoded.length() / 4];
+        for (int i = 0; i < encoded.length(); i += 4) {
+            int value = 0;
+            for (int offset = 0; offset < 4; offset++) {
+                int digit = Character.digit(encoded.charAt(i + offset), 16);
+                if (digit < 0) {
+                    throw new IllegalArgumentException("Invalid encoded flatfile id");
+                }
+                value = (value << 4) | digit;
             }
-            bytes[i / 2] = (byte) ((high << 4) | low);
+            chars[i / 4] = (char) value;
         }
-        return new String(bytes, StandardCharsets.UTF_8);
+        return new String(chars);
     }
 
     private static String decodePayload(String content) {
