@@ -27,9 +27,16 @@ public final class Database<T extends DataObject> implements AutoCloseable {
         this.table = TableNamer.tableName(settings.tablePrefix(), type);
     }
 
+    /**
+     * Blocking compatibility API. The write still goes through the tracked
+     * per-key lane and waits for the actual write/reconciliation task rather
+     * than a caller timeout view.
+     */
     public void saveObject(T obj) {
-        String json = VertexCoreApi.get().json().toJson(type, obj);
-        VertexCoreApi.get().backendFor(owner, settings).set(table, obj.getUniqueId(), json);
+        DatabaseWriteResult result = saveObjectTrackedAsync(obj).completion().join();
+        if (result.status() != DatabaseWriteResult.Status.COMMITTED) {
+            throw new DatabaseWriteException(result);
+        }
     }
 
     public T loadObject(String uniqueId) {
