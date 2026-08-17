@@ -7,18 +7,28 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 public final class AsyncQueue {
-    private final Executor executor;
+    private final QueueState state;
     private final long timeoutMillis;
 
-    /**
-     * Always tracks the actual end of the queued task. Caller timeouts must
-     * never advance this tail while the underlying task is still running.
-     */
-    private CompletableFuture<Void> tail = CompletableFuture.completedFuture(null);
-
     public AsyncQueue(Executor executor, long timeoutMillis) {
-        this.executor = executor;
+        this(new QueueState(executor), timeoutMillis);
+    }
+
+    private AsyncQueue(QueueState state, long timeoutMillis) {
+        this.state = state;
         this.timeoutMillis = timeoutMillis;
+    }
+
+    /**
+     * Returns a timeout-specific caller view that shares this queue's ordering state.
+     * Tasks submitted through either instance remain in one ordered lane while each
+     * caller view applies its own timeout independently.
+     */
+    public AsyncQueue withTimeout(long timeoutMillis) {
+        if (this.timeoutMillis == timeoutMillis) {
+            return this;
+        }
+        return new AsyncQueue(state, timeoutMillis);
     }
 
     public <T> CompletableFuture<T> submit(Supplier<T> task) {
@@ -33,15 +43,21 @@ public final class AsyncQueue {
      * Submit without a caller timeout. The returned future represents the
      * actual task settlement and is also what the queue uses for ordering.
      */
-    public synchronized <T> CompletableFuture<T> submitRaw(Supplier<T> task) {
-        CompletableFuture<T> raw = tail.thenApplyAsync(v -> task.get(), executor);
-        tail = raw.handle((result, error) -> null);
+    public <T> CompletableFuture<T> submitRaw(Supplier<T> task) {
+        CompletableFuture<T> raw;
+        synchronized (state) {
+            raw = state.tail.thenApplyAsync(v -> task.get(), state.executor);
+            state.tail = raw.handle((result, error) -> null);
+        }
         return raw;
     }
 
-    public synchronized CompletableFuture<Void> submitVoidRaw(Runnable task) {
-        CompletableFuture<Void> raw = tail.thenRunAsync(task, executor);
-        tail = raw.handle((result, error) -> null);
+    public CompletableFuture<Void> submitVoidRaw(Runnable task) {
+        CompletableFuture<Void> raw;
+        synchronized (state) {
+            raw = state.tail.thenRunAsync(task, state.executor);
+            state.tail = raw.handle((result, error) -> null);
+        }
         return raw;
     }
 
@@ -66,5 +82,14 @@ public final class AsyncQueue {
         );
 
         return view;
+    }
+
+    private static final class QueueState {
+        private final Executor executor;
+        private CompletableFuture<Void> tail = CompletableFuture.completedFuture(null);
+
+        private QueueState(Executor executor) {
+            this.executor = executor;
+        }
     }
 }
