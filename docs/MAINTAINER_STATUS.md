@@ -14,7 +14,7 @@ Die erste Runde des Epics #3 (`1.1.0 – Safety & NexusVault Compatibility`) ist
 
 Gemeinsamer Vorbereitungs-Base-SHA: `018edbed0ac40dec4833712ebb2b50e511cc3f1c`
 
-Die Arbeitsbranches wurden vor diesem reinen Maintainer-Bookkeeping-Commit erstellt. Dadurch können sie gegenüber dem aktuellen `next` ausschließlich um diese Statusdokumentation zurückliegen; das ist keine funktionale Abhängigkeit und darf nicht durch eigenmächtiges Rebase/Force-Push korrigiert werden.
+Die Arbeitsbranches wurden vor den anschließenden reinen Maintainer-/Workflow-Setup-Commits auf `next` erstellt. Sie können deshalb gegenüber dem aktuellen `next` ausschließlich um Maintainer-Status und CI-/CodeQL-Trigger für `next` zurückliegen. Das ist keine funktionale Abhängigkeit und darf nicht durch eigenmächtiges Rebase/Force-Push korrigiert werden. Bei jedem späteren Worker-Push auf den PR-Branch greifen die auf `next` aktivierten PR-Checks.
 
 ## Freie vorbereitete Draft-PRs
 
@@ -47,6 +47,12 @@ Noch ohne Arbeitsbranch/Draft-PR, damit die Grenze von höchstens drei aktiven U
 - danach Epic #4 gemäß dessen Abhängigkeiten
 
 Der Hauptchat bereitet weitere Branches und Draft-PRs erst vor, wenn Kapazität frei ist und der aktuelle `next`-Stand erneut geprüft wurde.
+
+## CI / CodeQL
+
+- Pull Requests gegen `next` und `development` lösen CI sowie CodeQL aus.
+- Pushes auf `next` und `development` lösen ebenfalls beide Workflows aus.
+- Feature-/Fix-Branches werden nicht separat per Push-Trigger gebaut; ihre Checks laufen über den PR gegen `next`.
 
 ## Promotion `next -> development`
 
