@@ -99,12 +99,17 @@ public final class VertexCoreAdminCommands {
             return;
         }
 
-        ctx.reply("Starting migration: plugin=" + targetPlugin.getName() + " from=" + from + " to=" + to
-                + (opt.dryRun ? " (dry-run)" : ""));
-
         VertexCoreApi api = VertexCoreApi.get();
         DatabaseBackend source = api.backendFor(targetPlugin, sourceSettings);
         DatabaseBackend target = api.backendFor(targetPlugin, targetSettings);
+
+        if (source.sameStorageAs(target) || target.sameStorageAs(source)) {
+            ctx.reply("Refusing migration: source and target refer to the same storage.");
+            return;
+        }
+
+        ctx.reply("Starting migration: plugin=" + targetPlugin.getName() + " from=" + from + " to=" + to
+                + (opt.dryRun ? " (dry-run)" : ""));
 
         MigrationProgress progress = new ConsoleMigrationProgress(targetPlugin.getLogger());
         DatabaseMigrationRunner runner = new DatabaseMigrationRunner();

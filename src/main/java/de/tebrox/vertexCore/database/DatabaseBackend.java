@@ -12,6 +12,17 @@ public interface DatabaseBackend extends AutoCloseable {
     List<String[]> loadAllRaw(String table); // each entry: [uniqueId, json]
 
     /**
+     * Returns whether this backend and another backend address the same storage.
+     *
+     * <p>The default deliberately recognizes only the same backend instance so
+     * existing third-party implementations remain compatible. Built-in backends
+     * override this when they can compare their concrete storage identity.</p>
+     */
+    default boolean sameStorageAs(DatabaseBackend other) {
+        return this == other;
+    }
+
+    /**
      * Executes a write that can later be reconciled by operation id.
      *
      * <p>Backends that cannot provide a stronger guarantee may rely on this

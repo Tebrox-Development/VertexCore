@@ -11,6 +11,10 @@ public final class DatabaseMigrator {
             String table,
             MigrationOptions opt,
             MigrationProgress progress) {
+        if (source.sameStorageAs(target) || target.sameStorageAs(source)) {
+            throw new IllegalArgumentException("Migration source and target refer to the same storage.");
+        }
+
         List<String[]> rows = source.loadAllRaw(table);
         long total = rows.size();
 

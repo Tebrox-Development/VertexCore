@@ -5,6 +5,7 @@ import de.tebrox.vertexCore.database.DatabaseWriteResult;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -60,6 +61,13 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
         } catch (Exception e) {
             throw new RuntimeException("Failed to write: " + f.getAbsolutePath(), e);
         }
+    }
+
+    @Override
+    public boolean sameStorageAs(DatabaseBackend other) {
+        if (this == other) return true;
+        if (!(other instanceof FlatfileDatabaseBackend flatfile)) return false;
+        return storageRootIdentity().equals(flatfile.storageRootIdentity());
     }
 
     @Override
@@ -153,6 +161,14 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
             }
         }
         return out;
+    }
+
+    private String storageRootIdentity() {
+        try {
+            return root.getCanonicalPath();
+        } catch (IOException ignored) {
+            return root.getAbsoluteFile().toPath().normalize().toString();
+        }
     }
 
     private Object lockFor(String table, String uniqueId) {

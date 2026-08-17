@@ -138,6 +138,13 @@ public final class JdbcDatabaseBackend implements DatabaseBackend {
     }
 
     @Override
+    public boolean sameStorageAs(DatabaseBackend other) {
+        if (this == other) return true;
+        if (!(other instanceof JdbcDatabaseBackend jdbc)) return false;
+        return Objects.equals(ds.getJdbcUrl(), jdbc.ds.getJdbcUrl());
+    }
+
+    @Override
     public DatabaseWriteResult writeTracked(String table, String uniqueId, String json, UUID operationId) {
         table = sanitizeTableName(table);
         try {
