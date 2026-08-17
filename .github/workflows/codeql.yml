@@ -2,9 +2,9 @@ name: CodeQL
 
 on:
   pull_request:
-    branches: [development]
+    branches: [development, next]
   push:
-    branches: [development]
+    branches: [development, next]
   workflow_dispatch:
 
 permissions:
@@ -35,7 +35,7 @@ jobs:
           languages: java-kotlin
 
       - name: Build
-        run: mvn -B -ntp -DskipTests package
+        run: ./mvnw -B -ntp -DskipTests package
 
       - name: Analyze
         uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
