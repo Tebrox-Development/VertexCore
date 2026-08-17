@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
@@ -53,10 +54,23 @@ public class DatabaseService implements Listener {
     }
 
     public AsyncQueue queueFor(Plugin owner, long timeoutMillis) {
-        String key = owner.getName().toLowerCase();
+        return queueForOwner(
+                queues,
+                owner.getName().toLowerCase(),
+                r -> Bukkit.getScheduler().runTaskAsynchronously(core, r),
+                timeoutMillis
+        );
+    }
+
+    static AsyncQueue queueForOwner(
+            Map<String, AsyncQueue> queues,
+            String ownerKey,
+            Executor executor,
+            long timeoutMillis
+    ) {
         AsyncQueue orderingQueue = queues.computeIfAbsent(
-                key,
-                k -> new AsyncQueue(r -> Bukkit.getScheduler().runTaskAsynchronously(core, r), 0)
+                ownerKey,
+                k -> new AsyncQueue(executor, 0)
         );
         return orderingQueue.withTimeout(timeoutMillis);
     }
