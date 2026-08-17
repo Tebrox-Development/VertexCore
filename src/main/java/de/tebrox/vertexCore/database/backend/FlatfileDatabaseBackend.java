@@ -11,12 +11,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class FlatfileDatabaseBackend implements DatabaseBackend {
 
     private static final String TRACKED_PREFIX = "__VERTEXCORE_TRACKED_WRITE_V1__\n";
+    private static final String ENCODED_ID_DIRECTORY = ".vertexcore-ids-v2";
     private static final int LOCK_STRIPES = 64;
 
     public static FlatfileDatabaseBackend start(Plugin owner) {
@@ -39,8 +42,8 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
 
     @Override
     public String get(String table, String uniqueId) {
-        File f = file(table, uniqueId);
-        if (!f.exists()) return null;
+        File f = readableFile(table, uniqueId);
+        if (f == null) return null;
         try {
             return decodePayload(Files.readString(f.toPath(), StandardCharsets.UTF_8));
         } catch (Exception e) {
@@ -50,7 +53,7 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
 
     @Override
     public void set(String table, String uniqueId, String json) {
-        File f = file(table, uniqueId);
+        File f = encodedFile(table, uniqueId);
         File parent = f.getParentFile();
         if (!parent.exists() && !parent.mkdirs()) {
             throw new RuntimeException("Failed to create folder: " + parent.getAbsolutePath());
@@ -65,7 +68,7 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
     @Override
     public DatabaseWriteResult writeTracked(String table, String uniqueId, String json, UUID operationId) {
         synchronized (lockFor(table, uniqueId)) {
-            File f = file(table, uniqueId);
+            File f = encodedFile(table, uniqueId);
             File parent = f.getParentFile();
             if (!parent.exists() && !parent.mkdirs()) {
                 return DatabaseWriteResult.notCommitted(
@@ -76,7 +79,7 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
 
             Path temp = null;
             try {
-                temp = Files.createTempFile(parent.toPath(), sanitize(uniqueId) + ".", ".vc-write");
+                temp = Files.createTempFile(parent.toPath(), "vc-write-", ".tmp");
                 String envelope = TRACKED_PREFIX + operationId + "\n" + json;
                 Files.writeString(temp, envelope, StandardCharsets.UTF_8);
                 try {
@@ -109,8 +112,8 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
     @Override
     public DatabaseWriteResult reconcileTrackedWrite(String table, String uniqueId, UUID operationId) {
         synchronized (lockFor(table, uniqueId)) {
-            File f = file(table, uniqueId);
-            if (!f.exists()) return DatabaseWriteResult.notCommitted(operationId, null);
+            File f = readableFile(table, uniqueId);
+            if (f == null) return DatabaseWriteResult.notCommitted(operationId, null);
             try {
                 String content = Files.readString(f.toPath(), StandardCharsets.UTF_8);
                 String storedOperation = trackedOperationId(content);
@@ -126,37 +129,63 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
 
     @Override
     public void delete(String table, String uniqueId) {
-        File f = file(table, uniqueId);
-        if (f.exists()) f.delete();
+        File encoded = encodedFile(table, uniqueId);
+        if (encoded.exists()) {
+            encoded.delete();
+            return;
+        }
+        File legacy = legacyFile(table, uniqueId);
+        if (legacy.exists()) legacy.delete();
     }
 
     @Override
     public boolean exists(String table, String uniqueId) {
-        return file(table, uniqueId).exists();
+        return encodedFile(table, uniqueId).exists() || legacyFile(table, uniqueId).exists();
     }
 
     @Override
     public List<String[]> loadAllRaw(String table) {
+        Map<String, String> records = new LinkedHashMap<>();
         File dir = tableDir(table);
-        List<String[]> out = new ArrayList<>();
-        if (!dir.exists()) return out;
-        File[] files = dir.listFiles((d, name) -> name.endsWith(".json"));
-        if (files == null) return out;
+        if (!dir.exists()) return new ArrayList<>();
 
-        for (File f : files) {
-            try {
-                String id = f.getName().substring(0, f.getName().length() - 5);
-                String json = decodePayload(Files.readString(f.toPath(), StandardCharsets.UTF_8));
-                out.add(new String[]{id, json});
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to read: " + f.getAbsolutePath(), e);
+        File[] legacyFiles = dir.listFiles((d, name) -> name.endsWith(".json"));
+        if (legacyFiles != null) {
+            for (File f : legacyFiles) {
+                try {
+                    String id = f.getName().substring(0, f.getName().length() - 5);
+                    String json = decodePayload(Files.readString(f.toPath(), StandardCharsets.UTF_8));
+                    records.put(id, json);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to read: " + f.getAbsolutePath(), e);
+                }
             }
+        }
+
+        File encodedDir = encodedIdDir(table);
+        File[] encodedFiles = encodedDir.listFiles((d, name) -> name.endsWith(".json"));
+        if (encodedFiles != null) {
+            for (File f : encodedFiles) {
+                try {
+                    String encodedId = f.getName().substring(0, f.getName().length() - 5);
+                    String id = decodeId(encodedId);
+                    String json = decodePayload(Files.readString(f.toPath(), StandardCharsets.UTF_8));
+                    records.put(id, json);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to read: " + f.getAbsolutePath(), e);
+                }
+            }
+        }
+
+        List<String[]> out = new ArrayList<>(records.size());
+        for (Map.Entry<String, String> entry : records.entrySet()) {
+            out.add(new String[]{entry.getKey(), entry.getValue()});
         }
         return out;
     }
 
     private Object lockFor(String table, String uniqueId) {
-        int hash = 31 * sanitize(table).hashCode() + sanitize(uniqueId).hashCode();
+        int hash = 31 * sanitize(table).hashCode() + uniqueId.hashCode();
         return writeLocks[Math.floorMod(hash, writeLocks.length)];
     }
 
@@ -164,8 +193,50 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
         return new File(root, sanitize(table));
     }
 
-    private File file(String table, String uniqueId) {
+    private File encodedIdDir(String table) {
+        return new File(tableDir(table), ENCODED_ID_DIRECTORY);
+    }
+
+    private File encodedFile(String table, String uniqueId) {
+        return new File(encodedIdDir(table), encodeId(uniqueId) + ".json");
+    }
+
+    private File legacyFile(String table, String uniqueId) {
         return new File(tableDir(table), sanitize(uniqueId) + ".json");
+    }
+
+    private File readableFile(String table, String uniqueId) {
+        File encoded = encodedFile(table, uniqueId);
+        if (encoded.exists()) return encoded;
+        File legacy = legacyFile(table, uniqueId);
+        return legacy.exists() ? legacy : null;
+    }
+
+    private static String encodeId(String id) {
+        byte[] bytes = id.getBytes(StandardCharsets.UTF_8);
+        StringBuilder encoded = new StringBuilder(bytes.length * 2);
+        for (byte value : bytes) {
+            int unsigned = value & 0xff;
+            encoded.append(Character.forDigit(unsigned >>> 4, 16));
+            encoded.append(Character.forDigit(unsigned & 0x0f, 16));
+        }
+        return encoded.toString();
+    }
+
+    private static String decodeId(String encoded) {
+        if ((encoded.length() & 1) != 0) {
+            throw new IllegalArgumentException("Invalid encoded flatfile id");
+        }
+        byte[] bytes = new byte[encoded.length() / 2];
+        for (int i = 0; i < encoded.length(); i += 2) {
+            int high = Character.digit(encoded.charAt(i), 16);
+            int low = Character.digit(encoded.charAt(i + 1), 16);
+            if (high < 0 || low < 0) {
+                throw new IllegalArgumentException("Invalid encoded flatfile id");
+            }
+            bytes[i / 2] = (byte) ((high << 4) | low);
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     private static String decodePayload(String content) {
