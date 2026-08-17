@@ -55,4 +55,41 @@ class AsyncQueueTest {
         secondCompletion.get(1, TimeUnit.SECONDS);
         assertTrue(secondStarted.get());
     }
+
+    @Test
+    void differentTimeoutViewsShareOrderingWithoutReusingFirstTimeout() throws Exception {
+        AsyncQueue orderingQueue = new AsyncQueue(executor, 0);
+        AsyncQueue shortTimeoutQueue = orderingQueue.withTimeout(50);
+        AsyncQueue longTimeoutQueue = orderingQueue.withTimeout(500);
+        CountDownLatch firstStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        AtomicBoolean secondStarted = new AtomicBoolean(false);
+
+        CompletableFuture<Void> firstCallerView = shortTimeoutQueue.submitVoid(() -> {
+            firstStarted.countDown();
+            try {
+                releaseFirst.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+        });
+
+        assertTrue(firstStarted.await(1, TimeUnit.SECONDS));
+        ExecutionException timeout = assertThrows(
+                ExecutionException.class,
+                () -> firstCallerView.get(1, TimeUnit.SECONDS)
+        );
+        assertInstanceOf(TimeoutException.class, timeout.getCause());
+
+        CompletableFuture<Void> secondCallerView = longTimeoutQueue.submitVoid(() -> secondStarted.set(true));
+        Thread.sleep(100);
+
+        assertFalse(secondStarted.get(), "different timeout views must still share the same ordering tail");
+        assertFalse(secondCallerView.isDone(), "later queue view must not inherit the first queue's shorter timeout");
+
+        releaseFirst.countDown();
+        secondCallerView.get(1, TimeUnit.SECONDS);
+        assertTrue(secondStarted.get());
+    }
 }
