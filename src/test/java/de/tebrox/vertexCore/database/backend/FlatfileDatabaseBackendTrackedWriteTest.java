@@ -12,6 +12,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FlatfileDatabaseBackendTrackedWriteTest {
 
@@ -93,6 +96,39 @@ class FlatfileDatabaseBackendTrackedWriteTest {
         assertEquals(2, all.size());
         assertEquals("new", all.get("foo/bar"));
         assertEquals("legacy", all.get("foo_bar"));
+    }
+
+    @Test
+    void legacyValueDoesNotReappearAfterV2Delete() throws Exception {
+        FlatfileDatabaseBackend backend = new FlatfileDatabaseBackend(tempDir);
+        File tableDir = new File(tempDir, "vault_data");
+        tableDir.mkdirs();
+        File legacy = new File(tableDir, "vault-1.json");
+        Files.writeString(legacy.toPath(), "legacy", StandardCharsets.UTF_8);
+
+        backend.set("vault_data", "vault-1", "new");
+        backend.delete("vault_data", "vault-1");
+
+        assertNull(backend.get("vault_data", "vault-1"));
+        assertFalse(backend.exists("vault_data", "vault-1"));
+        assertFalse(loadAll(backend, "vault_data").containsKey("vault-1"));
+        assertTrue(legacy.exists());
+    }
+
+    @Test
+    void deletingCollidingIdDoesNotDeleteLegacyFileForOtherId() throws Exception {
+        FlatfileDatabaseBackend backend = new FlatfileDatabaseBackend(tempDir);
+        File tableDir = new File(tempDir, "vault_data");
+        tableDir.mkdirs();
+        File legacy = new File(tableDir, "foo_bar.json");
+        Files.writeString(legacy.toPath(), "legacy", StandardCharsets.UTF_8);
+
+        backend.delete("vault_data", "foo/bar");
+
+        assertNull(backend.get("vault_data", "foo/bar"));
+        assertEquals("legacy", backend.get("vault_data", "foo_bar"));
+        assertTrue(legacy.exists());
+        assertEquals("legacy", loadAll(backend, "vault_data").get("foo_bar"));
     }
 
     private static Map<String, String> loadAll(FlatfileDatabaseBackend backend, String table) {
