@@ -79,6 +79,23 @@ class FlatfileDatabaseBackendTrackedWriteTest {
     }
 
     @Test
+    void arbitraryJavaStringIdsRoundTripLosslessly() {
+        FlatfileDatabaseBackend backend = new FlatfileDatabaseBackend(tempDir);
+        String highSurrogateOnly = "edge-" + (char) 0xD800;
+        String lowSurrogateOnly = "edge-" + (char) 0xDC00;
+
+        backend.set("vault_data", highSurrogateOnly, "high");
+        backend.set("vault_data", lowSurrogateOnly, "low");
+
+        assertEquals("high", backend.get("vault_data", highSurrogateOnly));
+        assertEquals("low", backend.get("vault_data", lowSurrogateOnly));
+
+        Map<String, String> all = loadAll(backend, "vault_data");
+        assertEquals("high", all.get(highSurrogateOnly));
+        assertEquals("low", all.get(lowSurrogateOnly));
+    }
+
+    @Test
     void newWritesDoNotOverwriteCollidingLegacyFiles() throws Exception {
         FlatfileDatabaseBackend backend = new FlatfileDatabaseBackend(tempDir);
         File tableDir = new File(tempDir, "vault_data");
