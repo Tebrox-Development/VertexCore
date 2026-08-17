@@ -20,6 +20,7 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
 
     private static final String TRACKED_PREFIX = "__VERTEXCORE_TRACKED_WRITE_V1__\n";
     private static final String ENCODED_ID_DIRECTORY = ".vertexcore-ids-v2";
+    private static final String TOMBSTONE_EXTENSION = ".deleted";
     private static final int LOCK_STRIPES = 64;
 
     public static FlatfileDatabaseBackend start(Plugin owner) {
@@ -60,6 +61,7 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
         }
         try {
             Files.writeString(f.toPath(), json, StandardCharsets.UTF_8);
+            clearTombstone(table, uniqueId);
         } catch (Exception e) {
             throw new RuntimeException("Failed to write: " + f.getAbsolutePath(), e);
         }
@@ -87,6 +89,7 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
                 } catch (AtomicMoveNotSupportedException ignored) {
                     Files.move(temp, f.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 }
+                clearTombstone(table, uniqueId);
                 return DatabaseWriteResult.committed(operationId);
             } catch (Exception ex) {
                 DatabaseWriteResult reconciled = reconcileTrackedWrite(table, uniqueId, operationId);
@@ -129,18 +132,24 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
 
     @Override
     public void delete(String table, String uniqueId) {
-        File encoded = encodedFile(table, uniqueId);
-        if (encoded.exists()) {
-            encoded.delete();
-            return;
+        File tombstone = tombstoneFile(table, uniqueId);
+        File parent = tombstone.getParentFile();
+        if (!parent.exists() && !parent.mkdirs()) {
+            throw new RuntimeException("Failed to create folder: " + parent.getAbsolutePath());
         }
-        File legacy = legacyFile(table, uniqueId);
-        if (legacy.exists()) legacy.delete();
+        try {
+            Files.writeString(tombstone.toPath(), "", StandardCharsets.UTF_8);
+            Files.deleteIfExists(encodedFile(table, uniqueId).toPath());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete flatfile id: " + uniqueId, e);
+        }
     }
 
     @Override
     public boolean exists(String table, String uniqueId) {
-        return encodedFile(table, uniqueId).exists() || legacyFile(table, uniqueId).exists();
+        if (encodedFile(table, uniqueId).exists()) return true;
+        if (tombstoneFile(table, uniqueId).exists()) return false;
+        return legacyFile(table, uniqueId).exists();
     }
 
     @Override
@@ -154,6 +163,7 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
             for (File f : legacyFiles) {
                 try {
                     String id = f.getName().substring(0, f.getName().length() - 5);
+                    if (tombstoneFile(table, id).exists()) continue;
                     String json = decodePayload(Files.readString(f.toPath(), StandardCharsets.UTF_8));
                     records.put(id, json);
                 } catch (Exception e) {
@@ -201,6 +211,10 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
         return new File(encodedIdDir(table), encodeId(uniqueId) + ".json");
     }
 
+    private File tombstoneFile(String table, String uniqueId) {
+        return new File(encodedIdDir(table), encodeId(uniqueId) + TOMBSTONE_EXTENSION);
+    }
+
     private File legacyFile(String table, String uniqueId) {
         return new File(tableDir(table), sanitize(uniqueId) + ".json");
     }
@@ -208,8 +222,16 @@ public final class FlatfileDatabaseBackend implements DatabaseBackend {
     private File readableFile(String table, String uniqueId) {
         File encoded = encodedFile(table, uniqueId);
         if (encoded.exists()) return encoded;
+        if (tombstoneFile(table, uniqueId).exists()) return null;
         File legacy = legacyFile(table, uniqueId);
         return legacy.exists() ? legacy : null;
+    }
+
+    private void clearTombstone(String table, String uniqueId) {
+        try {
+            Files.deleteIfExists(tombstoneFile(table, uniqueId).toPath());
+        } catch (Exception ignored) {
+        }
     }
 
     private static String encodeId(String id) {
