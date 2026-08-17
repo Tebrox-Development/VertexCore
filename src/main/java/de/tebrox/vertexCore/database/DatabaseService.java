@@ -54,7 +54,11 @@ public class DatabaseService implements Listener {
 
     public AsyncQueue queueFor(Plugin owner, long timeoutMillis) {
         String key = owner.getName().toLowerCase();
-        return queues.computeIfAbsent(key, k -> new AsyncQueue(r -> Bukkit.getScheduler().runTaskAsynchronously(core, r), timeoutMillis));
+        AsyncQueue orderingQueue = queues.computeIfAbsent(
+                key,
+                k -> new AsyncQueue(r -> Bukkit.getScheduler().runTaskAsynchronously(core, r), 0)
+        );
+        return orderingQueue.withTimeout(timeoutMillis);
     }
 
     public DatabaseWriteOperation submitTrackedWrite(
