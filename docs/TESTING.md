@@ -25,7 +25,7 @@ Für den Wechsel auf Paper 26.2 / Java 25 sind folgende Gates verbindlich:
 
 ## Runtime Smoke
 
-Der Runtime-Smoke soll automatisierbar und reproduzierbar sein. Er darf keine produktiven Serverdaten, Secrets oder externen Dienste benötigen.
+Der Runtime-Smoke ist automatisierbar und reproduzierbar und darf keine produktiven Serverdaten, Secrets oder externen Dienste benötigen.
 
 Der Smoke prüft mindestens:
 
@@ -37,6 +37,22 @@ Paper 26.2 startet
 → Server wird kontrolliert beendet
 → VertexCore wird sauber deaktiviert
 ```
+
+Die CI verwendet dafür `.github/workflows/runtime-smoke.yml` und `scripts/runtime-smoke.sh`.
+
+Der Harness:
+
+- baut zuerst den aktuellen PR-Head mit `mvn -B -ntp verify`,
+- lädt ausschließlich den explizit gepinnten stabilen Paper-Stand `26.2` Build `121` über den offiziellen PaperMC-Fill-Service,
+- verwendet das gerade gebaute `target/vertexCore-1.1.0-SNAPSHOT.jar`,
+- startet eine frische temporäre Runtime unter `target/runtime-smoke`,
+- wartet fail-closed auf den Paper-Ready-Marker und `VertexCore enabled.`,
+- wertet typische VertexCore-Load-/Enable-Exceptions als Fehler,
+- sendet anschließend kontrolliert `stop`,
+- verlangt einen erfolgreichen Server-Exit sowie `VertexCore disabled.`,
+- behandelt Disable-/Lifecycle-Exceptions als Fehler.
+
+Der Smoke benötigt Netzwerkzugriff ausschließlich zum offiziellen PaperMC-Download-Service und erzeugt keine dauerhaften externen Zustände.
 
 Sobald fachliche Runtime-Smokes existieren, werden zusätzlich repräsentative Wege für Config, Commands und Persistenz geprüft.
 
