@@ -43,8 +43,10 @@ reducing duplicated boilerplate across multiple plugins.
 
 ## Requirements
 
-- Paper 1.21+
-- Java 21+
+- Paper 26.2
+- Java 25+
+
+The current development line is compiled against the pinned stable Paper API build `26.2.build.121-stable`.
 
 ---
 
@@ -85,7 +87,7 @@ dependencies {
 
 <dependency>
     <groupId>com.github.Tebrox</groupId>
-    <artifactId>VertexCore</artifactactId>
+    <artifactId>VertexCore</artifactId>
     <version>v1.0.0</version>
     <scope>provided</scope>
 </dependency>
