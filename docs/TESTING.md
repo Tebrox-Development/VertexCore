@@ -22,6 +22,7 @@ Für den Wechsel auf Paper 26.2 / Java 25 sind folgende Gates verbindlich:
 4. VertexCore-JAR lässt sich auf einer reproduzierbaren Paper-26.2-Runtime laden.
 5. Server erreicht einen eindeutig erkennbaren erfolgreichen Startup-Zustand ohne VertexCore-Enable-Fehler.
 6. kontrollierter Shutdown endet ohne VertexCore-Lifecycle-Fehler.
+7. aktueller NexusVault-`dev` baut und testet erfolgreich gegen den geprüften VertexCore-Stand.
 
 ## Runtime Smoke
 
@@ -72,13 +73,25 @@ Bei Änderungen an Datenbank-, Migration-, Queue- oder Persistenzcode sind passe
 
 VertexCore 1.x bleibt kompatibilitätsorientiert. Ein grüner VertexCore-Build ist notwendig, aber bei Änderungen an öffentlicher API nicht hinreichend.
 
-Bei relevanten API-Änderungen muss der PR dokumentieren:
+Das automatisierte Gate verwendet `.github/workflows/nexusvault-consumer.yml` und `scripts/nexusvault-consumer-gate.sh`.
+
+Der Consumer-Check:
+
+- baut den aktuellen VertexCore-PR-Head unter Java 25,
+- installiert das daraus erzeugte JAR ausschließlich lokal unter den von NexusVault verwendeten Maven-Koordinaten `com.github.Tebrox:VertexCore:development-SNAPSHOT`,
+- checkt `Tebrox-Development/NexusVault` Branch `dev` read-only in ein temporäres Verzeichnis unter `target/` aus,
+- gibt den tatsächlich geprüften NexusVault-Commit-SHA im Run aus,
+- führt im unveränderten NexusVault-Checkout `mvn -B -ntp verify` aus,
+- schlägt bei fehlendem Repo-Zugriff, Compile-Fehlern oder Testfehlern fail-closed fehl,
+- schreibt weder in das NexusVault-Repository noch in externe dauerhafte Zustände.
+
+Der Self-Hosted Runner muss read-only Git-Zugriff auf das private NexusVault-Repository besitzen. Das Gate führt keine Secret-, Token- oder Repository-Berechtigungsänderungen durch.
+
+Bei relevanten API-Änderungen muss der PR zusätzlich dokumentieren:
 
 - welche öffentliche API betroffen ist,
 - ob NexusVault diese API verwendet,
 - warum die Änderung source-/binary-kompatibel bleibt oder welcher Übergangsadapter vorhanden ist.
-
-Cross-Project-Tests mit NexusVault werden als eigenes Infrastruktur-Gate aufgebaut; bis dahin darf fehlende Cross-Project-CI nicht als Begründung für absichtliche API-Breaks dienen.
 
 ## Testangaben in PRs
 
