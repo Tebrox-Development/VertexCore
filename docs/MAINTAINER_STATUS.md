@@ -26,27 +26,47 @@ Reihenfolge:
 
 1. Build-/CI-Plattform auf Java 25 und Paper 26.2 heben.
 2. reproduzierbaren Paper-26.2-Runtime-Smoke etablieren.
-3. VertexCore-Funktionsbereiche auf der neuen Runtime gezielt smoken/regressionssichern.
-4. erst nach erfolgreichem VertexCore-Abschluss NexusVault separat nachziehen.
+3. NexusVault als realen Consumer gegen den neuen VertexCore-Stand prüfen.
+4. erst nach erfolgreichem VertexCore-Abschluss NexusVault separat auf Paper 26.2 / aktuellen BentoBox-Stand migrieren.
 
 ## Vorbereitete PRs
 
-Noch keine. Neue vorbereitete PRs werden hier nach dem Schema eingetragen:
+### PR #42 | Java 25 und Paper 26.2 als Build-Basis etablieren
 
 ```text
-PR #<nr> | <titel>
-Status: FREI | IN ARBEIT | READY FOR REVIEW | READY TO MERGE
-Worker-ID: — | <id>
-Issue: #<nr>
-Branch: <branch>
-Scope: <kurzbeschreibung>
-Abhängigkeit: keine | PR/Issue
+Status: FREI
+Worker-ID: —
+Issue: #41
+Branch: infra/41-java25-paper26-platform
+Scope: Java-25-Toolchain, Paper-26.2-API, CI auf Organization Self-Hosted Runner; keine Features
+Abhängigkeit: keine
+```
+
+## Geplante Folge-Slices
+
+Diese Issues sind bewusst noch **nicht** als Draft-PR vorbereitet. Der Maintainer erstellt den jeweiligen Branch/PR erst nach Integration der Voraussetzung frisch vom dann aktuellen `development`.
+
+### Issue #43 | Paper-26.2-Runtime-Smoke
+
+```text
+Status: BLOCKIERT
+Abhängigkeit: #41 integriert
+Danach: Branch + Draft-PR frisch von development vorbereiten
+```
+
+### Issue #44 | NexusVault Consumer Compatibility Gate
+
+```text
+Status: BLOCKIERT
+Abhängigkeit: #41 und #43 integriert
+Danach: Branch + Draft-PR frisch von development vorbereiten
 ```
 
 ## Maintainer-Regel
 
 - maximal drei parallele Worker,
 - Plattform-/Build-Slices vor Runtime-/Consumer-Slices,
+- abhängige PRs nicht vor ihrer Voraussetzung auf veralteter Basis vorbereiten,
 - kein Worker merged selbst,
 - keine NexusVault-Codeänderung aus VertexCore-PRs heraus,
 - keine API-Breaks im 1.x-Kompatibilitätspfad.
