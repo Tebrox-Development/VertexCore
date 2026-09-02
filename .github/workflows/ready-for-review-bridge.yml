@@ -1,0 +1,54 @@
+name: Ready for Review Bridge
+
+on:
+  pull_request_target:
+    branches:
+      - development
+    types:
+      - edited
+
+permissions:
+  contents: read
+
+jobs:
+  mark-ready:
+    name: Mark draft PR ready
+    if: >-
+      ${{
+        github.event.pull_request.draft == true &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+
+    steps:
+      - name: Check bounded workflow status marker
+        id: status
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          body="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" | head -n 20)"
+          if printf '%s\n' "$body" | grep -Fxq '**READY FOR REVIEW**' || \
+             printf '%s\n' "$body" | grep -Fxq 'Arbeitsstatus: READY FOR REVIEW'; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mark pull request ready for review
+        if: ${{ steps.status.outputs.ready == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.VERTEXCORE_READY_FOR_REVIEW_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error title=Missing repository secret::VERTEXCORE_READY_FOR_REVIEW_TOKEN is not configured"
+            exit 1
+          fi
+
+          gh pr ready "$PR_NUMBER" --repo "$REPOSITORY"
