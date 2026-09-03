@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PAPER_VERSION="26.2"
-PAPER_BUILD="121"
+PAPER_VERSION="${PAPER_VERSION:-26.2}"
+PAPER_BUILD="${PAPER_BUILD:-121}"
 USER_AGENT="VertexCore-runtime-smoke/1.0 (https://github.com/Tebrox-Development/VertexCore)"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUNTIME_DIR="${ROOT_DIR}/target/runtime-smoke"
+RUNTIME_DIR="${ROOT_DIR}/target/runtime-smoke-${PAPER_VERSION}-${PAPER_BUILD}"
 SERVER_DIR="${RUNTIME_DIR}/server"
 LOG_FILE="${SERVER_DIR}/logs/latest.log"
 BUILD_JSON="${RUNTIME_DIR}/paper-builds.json"
-PLUGIN_JAR="${ROOT_DIR}/target/vertexCore-1.1.0-SNAPSHOT.jar"
+PROJECT_VERSION="$(mvn -B -ntp help:evaluate -Dexpression=project.version -q -DforceStdout)"
+PLUGIN_JAR="${ROOT_DIR}/target/vertexCore-${PROJECT_VERSION}.jar"
 
 rm -rf "${RUNTIME_DIR}"
 mkdir -p "${SERVER_DIR}/plugins"
@@ -88,7 +89,7 @@ for _ in $(seq 1 120); do
 done
 
 if [[ "${READY}" -ne 1 ]]; then
-  echo "Timed out waiting for Paper 26.2 and VertexCore to become ready" >&2
+  echo "Timed out waiting for Paper ${PAPER_VERSION} build ${PAPER_BUILD} and VertexCore to become ready" >&2
   cat "${SERVER_DIR}/server-console.log" >&2 || true
   exit 1
 fi
