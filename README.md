@@ -86,7 +86,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.github.Tebrox:VertexCore:v1.0.0")
+    compileOnly("com.github.Tebrox-Development:VertexCore:v1.1.0")
 }
 ```
 
@@ -99,9 +99,9 @@ dependencies {
 </repository>
 
 <dependency>
-    <groupId>com.github.Tebrox</groupId>
+    <groupId>com.github.Tebrox-Development</groupId>
     <artifactId>VertexCore</artifactId>
-    <version>v1.0.0</version>
+    <version>v1.1.0</version>
     <scope>provided</scope>
 </dependency>
 ```
