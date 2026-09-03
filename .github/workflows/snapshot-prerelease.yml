@@ -1,0 +1,100 @@
+name: Snapshot Pre-Release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: snapshot-prerelease
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build development snapshot
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout current development
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: development
+          fetch-depth: 1
+
+      - name: Set up Java 25
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Verify
+        run: mvn -B -ntp verify
+
+      - name: Prepare snapshot metadata
+        id: snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="$(mvn -B -ntp help:evaluate -Dexpression=project.version -q -DforceStdout)"
+          if [[ "${VERSION}" != *-SNAPSHOT ]]; then
+            echo "Expected a -SNAPSHOT project version, got: ${VERSION}" >&2
+            exit 1
+          fi
+
+          TARGET_SHA="$(git rev-parse HEAD)"
+          SHORT_SHA="${TARGET_SHA:0:8}"
+          DATE="$(date -u +%Y%m%d)"
+          BASE_VERSION="${VERSION%-SNAPSHOT}"
+          TAG="v${BASE_VERSION}-snapshot.${DATE}.${GITHUB_RUN_NUMBER}"
+          SOURCE_JAR="target/vertexCore-${VERSION}.jar"
+          ASSET_NAME="vertexCore-${VERSION}-${SHORT_SHA}.jar"
+
+          test -f "${SOURCE_JAR}"
+          cp "${SOURCE_JAR}" "${ASSET_NAME}"
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "target_sha=${TARGET_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "short_sha=${SHORT_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "asset_name=${ASSET_NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub pre-release
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          VERSION: ${{ steps.snapshot.outputs.version }}
+          TARGET_SHA: ${{ steps.snapshot.outputs.target_sha }}
+          SHORT_SHA: ${{ steps.snapshot.outputs.short_sha }}
+          TAG: ${{ steps.snapshot.outputs.tag }}
+          ASSET_NAME: ${{ steps.snapshot.outputs.asset_name }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+
+            const { data: release } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: process.env.TAG,
+              target_commitish: process.env.TARGET_SHA,
+              name: `VertexCore ${process.env.VERSION} (${process.env.SHORT_SHA})`,
+              body: `Snapshot from development commit ${process.env.TARGET_SHA}.`,
+              draft: false,
+              prerelease: true,
+            });
+
+            const data = fs.readFileSync(process.env.ASSET_NAME);
+            await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              name: process.env.ASSET_NAME,
+              data,
+              headers: {
+                'content-type': 'application/java-archive',
+                'content-length': data.length,
+              },
+            });
