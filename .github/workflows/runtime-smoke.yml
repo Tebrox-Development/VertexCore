@@ -11,7 +11,7 @@ permissions:
 jobs:
   runtime-smoke:
     name: Paper 26.2 / VertexCore Runtime Smoke
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, Linux, X64, vertexcore]
     timeout-minutes: 15
 
     steps:
