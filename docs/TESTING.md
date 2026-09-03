@@ -14,44 +14,34 @@ Der Build muss auf der für den jeweiligen Scope festgelegten Java-Toolchain lau
 
 ## Plattform-Kompatibilität
 
-VertexCore 1.1.x soll mit einem einzigen Artefakt einen breiteren Paper-Bereich abdecken. Der Build-Contract ist deshalb:
+VertexCore 1.1.x wird mit Java-21-Bytecode gebaut und gegen die minimale unterstützte Paper-API 1.21.4 kompiliert. Derselbe VertexCore-Stand wird an beiden Endpunkten des unterstützten Bereichs als Runtime-Smoke geprüft:
 
-```text
-Java-Bytecode: 21
-Compile API:   Paper 1.21.4
-Runtime-Gates: Paper 1.21.4 / Java 21 und Paper 26.2 / Java 25
-```
-
-Damit gilt Java 21 als minimale VertexCore-Runtime. Paper-Versionen ab 26.1 benötigen unabhängig davon serverseitig Java 25.
-
-Verbindliche Gates:
-
-1. Maven-Build und Tests auf Java 21 erfolgreich.
-2. Kompilierung gegen die minimale unterstützte Paper API 1.21.4 erfolgreich.
-3. VertexCore-JAR lässt sich auf Paper 1.21.4 mit Java 21 laden und sauber herunterfahren.
-4. Dasselbe JAR lässt sich auf Paper 26.2 mit Java 25 laden und sauber herunterfahren.
-5. der aus dem aktuellen NexusVault-`dev` abgeleitete Consumer-Contract kompiliert und testet erfolgreich auf Java 21 gegen den geprüften VertexCore-Stand.
-
-Zwischenversionen innerhalb des unterstützten Bereichs dürfen keine neueren Paper-APIs voraussetzen als die Compile-Baseline. Die beiden Runtime-Endpunkte bilden das verbindliche CI-Gate; zusätzliche Zwischenstände können bei Bedarf ergänzt werden.
+1. Maven-Build mit Java 21 erfolgreich.
+2. Kompilierung mit `--release 21` gegen Paper API 1.21.4 erfolgreich.
+3. vorhandene Unit-/Regressionstests erfolgreich.
+4. VertexCore-JAR lässt sich auf Paper 1.21.4 mit Java 21 laden.
+5. VertexCore-JAR lässt sich auf Paper 26.2 mit Java 25 laden.
+6. beide Server erreichen einen eindeutig erkennbaren erfolgreichen Startup-Zustand ohne VertexCore-Enable-Fehler.
+7. kontrollierter Shutdown endet auf beiden Runtime-Endpunkten ohne VertexCore-Lifecycle-Fehler.
+8. der aus dem aktuellen NexusVault-`dev` abgeleitete Consumer-Contract kompiliert und testet unter Java 21 erfolgreich gegen den geprüften VertexCore-Stand.
 
 ## Runtime Smoke
 
 Der Runtime-Smoke ist automatisierbar und reproduzierbar und darf keine produktiven Serverdaten, Secrets oder externen Dienste benötigen.
 
-Die CI verwendet `.github/workflows/runtime-smoke.yml` und `scripts/runtime-smoke.sh`. Der Harness ist über `PAPER_VERSION` und `PAPER_BUILD` parametrierbar.
-
-Aktuell gepinnte Matrix:
+Die CI verwendet dafür `.github/workflows/runtime-smoke.yml` und `scripts/runtime-smoke.sh` und prüft die Endpunkte:
 
 ```text
-Paper 1.21.4 Build 232 -> Java 21
-Paper 26.2  Build 121 -> Java 25
+Paper 1.21.4 Build 232 / Java 21
+Paper 26.2 Build 121 / Java 25
 ```
 
-Für jeden Matrix-Eintrag wird der aktuelle PR-Head mit `mvn -B -ntp verify` gebaut. Der Harness:
+Der Harness:
 
-- lädt ausschließlich den explizit gepinnten stabilen Paper-Build über den offiziellen PaperMC-Fill-Service,
-- verwendet das gerade gebaute `target/vertexCore-<project.version>.jar`,
-- startet eine frische temporäre Runtime unter `target/runtime-smoke-<paper>-<build>`,
+- verwendet dasselbe mit `--release 21` gebaute VertexCore-JAR für beide Runtime-Endpunkte,
+- lädt ausschließlich den explizit gepinnten Paper-Stand über den offiziellen PaperMC-Fill-Service,
+- verwendet das gerade gebaute `target/vertexCore-1.1.0-SNAPSHOT.jar`,
+- startet eine frische temporäre Runtime unter `target/runtime-smoke`,
 - wartet fail-closed auf den Paper-Ready-Marker und `VertexCore enabled.`,
 - wertet typische VertexCore-Load-/Enable-Exceptions als Fehler,
 - sendet anschließend kontrolliert `stop`,
@@ -96,7 +86,7 @@ Tebrox-Development/NexusVault dev
 412becf44e6de104cfb0804f7735ff012516c0cb
 ```
 
-Der Snapshot wurde für die Gate-Pflege ausschließlich read-only über GitHub gelesen. Wenn sich NexusVault-`dev` oder dessen VertexCore-Nutzung ändert, muss der Contract gegen den dann aktuellen `dev`-SHA read-only aktualisiert werden. Das Gate ersetzt bewusst keinen späteren NexusVault-Paper-/BentoBox-Migrationslauf und verändert NexusVault nicht.
+Der Snapshot wurde für die Gate-Pflege ausschließlich read-only über GitHub gelesen. Wenn sich NexusVault-`dev` oder dessen VertexCore-Nutzung ändert, muss der Contract gegen den dann aktuellen `dev`-SHA read-only aktualisiert werden.
 
 Bei relevanten API-Änderungen muss der PR zusätzlich dokumentieren:
 
