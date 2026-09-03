@@ -3,14 +3,52 @@ name: Paper Runtime Compatibility
 on:
   pull_request:
     branches: [development]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Classify runtime changes
+    runs-on: [self-hosted, Linux, X64, vertexcore]
+    outputs:
+      relevant: ${{ steps.classify.outputs.relevant }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Classify
+        id: classify
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" || "${EVENT_ACTION}" != "synchronize" || -z "${BEFORE_SHA:-}" ]]; then
+            echo "relevant=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" > /tmp/changed-files
+          cat /tmp/changed-files
+
+          if grep -Eq '^((src/main/)|(pom\.xml$)|(scripts/runtime-smoke\.sh$)|(\.github/workflows/runtime-smoke\.yml$))' /tmp/changed-files; then
+            echo "relevant=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "relevant=false" >> "${GITHUB_OUTPUT}"
+          fi
+
   runtime-smoke:
     name: Paper ${{ matrix.paper }} / Java ${{ matrix.java }}
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: [self-hosted, Linux, X64, vertexcore]
     timeout-minutes: 20
     strategy:
