@@ -3,6 +3,7 @@ name: NexusVault Consumer Compatibility
 on:
   pull_request:
     branches: [development]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -13,9 +14,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Classify consumer changes
+    runs-on: [self-hosted, Linux, X64, vertexcore]
+    outputs:
+      relevant: ${{ steps.classify.outputs.relevant }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Classify
+        id: classify
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" || "${EVENT_ACTION}" != "synchronize" || -z "${BEFORE_SHA:-}" ]]; then
+            echo "relevant=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" > /tmp/changed-files
+          cat /tmp/changed-files
+
+          if grep -Eq '^((src/main/)|(src/test/java/de/tebrox/vertexCore/compat/)|(pom\.xml$)|(scripts/nexusvault-consumer-gate\.sh$)|(\.github/workflows/nexusvault-consumer\.yml$))' /tmp/changed-files; then
+            echo "relevant=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "relevant=false" >> "${GITHUB_OUTPUT}"
+          fi
+
   consumer:
     name: NexusVault dev / VertexCore Compatibility
-    runs-on: [self-hosted, Linux, X64]
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: [self-hosted, Linux, X64, vertexcore]
     timeout-minutes: 20
 
     steps:
