@@ -14,39 +14,44 @@ Der Build muss auf der für den jeweiligen Scope festgelegten Java-Toolchain lau
 
 ## Plattform-Kompatibilität
 
-Für den Wechsel auf Paper 26.2 / Java 25 sind folgende Gates verbindlich:
+VertexCore 1.1.x soll mit einem einzigen Artefakt einen breiteren Paper-Bereich abdecken. Der Build-Contract ist deshalb:
 
-1. Maven-Build mit Java 25 erfolgreich.
-2. Kompilierung gegen Paper API 26.2 erfolgreich.
-3. vorhandene Unit-/Regressionstests erfolgreich.
-4. VertexCore-JAR lässt sich auf einer reproduzierbaren Paper-26.2-Runtime laden.
-5. Server erreicht einen eindeutig erkennbaren erfolgreichen Startup-Zustand ohne VertexCore-Enable-Fehler.
-6. kontrollierter Shutdown endet ohne VertexCore-Lifecycle-Fehler.
-7. der aus dem aktuellen NexusVault-`dev` abgeleitete Consumer-Contract kompiliert und testet erfolgreich gegen den geprüften VertexCore-Stand.
+```text
+Java-Bytecode: 21
+Compile API:   Paper 1.21.4
+Runtime-Gates: Paper 1.21.4 / Java 21 und Paper 26.2 / Java 25
+```
+
+Damit gilt Java 21 als minimale VertexCore-Runtime. Paper-Versionen ab 26.1 benötigen unabhängig davon serverseitig Java 25.
+
+Verbindliche Gates:
+
+1. Maven-Build und Tests auf Java 21 erfolgreich.
+2. Kompilierung gegen die minimale unterstützte Paper API 1.21.4 erfolgreich.
+3. VertexCore-JAR lässt sich auf Paper 1.21.4 mit Java 21 laden und sauber herunterfahren.
+4. Dasselbe JAR lässt sich auf Paper 26.2 mit Java 25 laden und sauber herunterfahren.
+5. der aus dem aktuellen NexusVault-`dev` abgeleitete Consumer-Contract kompiliert und testet erfolgreich auf Java 21 gegen den geprüften VertexCore-Stand.
+
+Zwischenversionen innerhalb des unterstützten Bereichs dürfen keine neueren Paper-APIs voraussetzen als die Compile-Baseline. Die beiden Runtime-Endpunkte bilden das verbindliche CI-Gate; zusätzliche Zwischenstände können bei Bedarf ergänzt werden.
 
 ## Runtime Smoke
 
 Der Runtime-Smoke ist automatisierbar und reproduzierbar und darf keine produktiven Serverdaten, Secrets oder externen Dienste benötigen.
 
-Der Smoke prüft mindestens:
+Die CI verwendet `.github/workflows/runtime-smoke.yml` und `scripts/runtime-smoke.sh`. Der Harness ist über `PAPER_VERSION` und `PAPER_BUILD` parametrierbar.
+
+Aktuell gepinnte Matrix:
 
 ```text
-Paper 26.2 startet
-→ VertexCore wird geladen
-→ VertexCore wird erfolgreich aktiviert
-→ keine uncaught VertexCore-Exception im Startup
-→ Server wird kontrolliert beendet
-→ VertexCore wird sauber deaktiviert
+Paper 1.21.4 Build 232 -> Java 21
+Paper 26.2  Build 121 -> Java 25
 ```
 
-Die CI verwendet dafür `.github/workflows/runtime-smoke.yml` und `scripts/runtime-smoke.sh`.
+Für jeden Matrix-Eintrag wird der aktuelle PR-Head mit `mvn -B -ntp verify` gebaut. Der Harness:
 
-Der Harness:
-
-- baut zuerst den aktuellen PR-Head mit `mvn -B -ntp verify`,
-- lädt ausschließlich den explizit gepinnten stabilen Paper-Stand `26.2` Build `121` über den offiziellen PaperMC-Fill-Service,
-- verwendet das gerade gebaute `target/vertexCore-1.1.0-SNAPSHOT.jar`,
-- startet eine frische temporäre Runtime unter `target/runtime-smoke`,
+- lädt ausschließlich den explizit gepinnten stabilen Paper-Build über den offiziellen PaperMC-Fill-Service,
+- verwendet das gerade gebaute `target/vertexCore-<project.version>.jar`,
+- startet eine frische temporäre Runtime unter `target/runtime-smoke-<paper>-<build>`,
 - wartet fail-closed auf den Paper-Ready-Marker und `VertexCore enabled.`,
 - wertet typische VertexCore-Load-/Enable-Exceptions als Fehler,
 - sendet anschließend kontrolliert `stop`,
@@ -54,8 +59,6 @@ Der Harness:
 - behandelt Disable-/Lifecycle-Exceptions als Fehler.
 
 Der Smoke benötigt Netzwerkzugriff ausschließlich zum offiziellen PaperMC-Download-Service und erzeugt keine dauerhaften externen Zustände.
-
-Sobald fachliche Runtime-Smokes existieren, werden zusätzlich repräsentative Wege für Config, Commands und Persistenz geprüft.
 
 ## Datenbank-/Persistenzänderungen
 
@@ -77,7 +80,7 @@ Das automatisierte Gate verwendet `.github/workflows/nexusvault-consumer.yml`, `
 
 Der Consumer-Check:
 
-- baut den aktuellen VertexCore-PR-Head unter Java 25,
+- baut den aktuellen VertexCore-PR-Head unter Java 21,
 - verwendet keinen NexusVault-Checkout und benötigt deshalb keine Cross-Repo-Credentials,
 - hält den geprüften realen Consumer-Ausgangspunkt als vollständigen NexusVault-`dev`-SHA fest,
 - bildet die von diesem NexusVault-Stand tatsächlich verwendeten VertexCore-1.x-Typen, Konstruktoren und Methoden als Java-Compile-Contract im VertexCore-Testbaum ab,
@@ -86,7 +89,7 @@ Der Consumer-Check:
 - schlägt fail-closed fehl, sobald eine von NexusVault verwendete VertexCore-Signatur nicht mehr source-kompatibel ist,
 - schreibt weder in das NexusVault-Repository noch in externe dauerhafte Zustände.
 
-Aktueller Snapshot für den Plattform-Slice #44:
+Aktueller Snapshot:
 
 ```text
 Tebrox-Development/NexusVault dev
