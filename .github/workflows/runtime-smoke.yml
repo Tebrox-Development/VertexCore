@@ -1,4 +1,4 @@
-name: Paper 26.2 Runtime Smoke
+name: Paper Runtime Compatibility
 
 on:
   pull_request:
@@ -10,23 +10,36 @@ permissions:
 
 jobs:
   runtime-smoke:
-    name: Paper 26.2 / VertexCore Runtime Smoke
+    name: Paper ${{ matrix.paper }} / Java ${{ matrix.java }}
     runs-on: [self-hosted, Linux, X64, vertexcore]
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - paper: '1.21.4'
+            build: '232'
+            java: '21'
+          - paper: '26.2'
+            build: '121'
+            java: '25'
 
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Set up Java 25
+      - name: Set up Java ${{ matrix.java }}
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: ${{ matrix.java }}
           cache: maven
 
       - name: Verify
         run: mvn -B -ntp verify
 
       - name: Runtime smoke
+        env:
+          PAPER_VERSION: ${{ matrix.paper }}
+          PAPER_BUILD: ${{ matrix.build }}
         run: bash scripts/runtime-smoke.sh
