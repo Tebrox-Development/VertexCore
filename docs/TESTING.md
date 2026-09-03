@@ -22,6 +22,7 @@ Für den Wechsel auf Paper 26.2 / Java 25 sind folgende Gates verbindlich:
 4. VertexCore-JAR lässt sich auf einer reproduzierbaren Paper-26.2-Runtime laden.
 5. Server erreicht einen eindeutig erkennbaren erfolgreichen Startup-Zustand ohne VertexCore-Enable-Fehler.
 6. kontrollierter Shutdown endet ohne VertexCore-Lifecycle-Fehler.
+7. der aus dem aktuellen NexusVault-`dev` abgeleitete Consumer-Contract kompiliert und testet erfolgreich gegen den geprüften VertexCore-Stand.
 
 ## Runtime Smoke
 
@@ -72,13 +73,33 @@ Bei Änderungen an Datenbank-, Migration-, Queue- oder Persistenzcode sind passe
 
 VertexCore 1.x bleibt kompatibilitätsorientiert. Ein grüner VertexCore-Build ist notwendig, aber bei Änderungen an öffentlicher API nicht hinreichend.
 
-Bei relevanten API-Änderungen muss der PR dokumentieren:
+Das automatisierte Gate verwendet `.github/workflows/nexusvault-consumer.yml`, `scripts/nexusvault-consumer-gate.sh` und `NexusVaultConsumerCompatibilityTest`.
+
+Der Consumer-Check:
+
+- baut den aktuellen VertexCore-PR-Head unter Java 25,
+- verwendet keinen NexusVault-Checkout und benötigt deshalb keine Cross-Repo-Credentials,
+- hält den geprüften realen Consumer-Ausgangspunkt als vollständigen NexusVault-`dev`-SHA fest,
+- bildet die von diesem NexusVault-Stand tatsächlich verwendeten VertexCore-1.x-Typen, Konstruktoren und Methoden als Java-Compile-Contract im VertexCore-Testbaum ab,
+- lässt diesen Contract im normalen Maven-`test-compile` gegen exakt die VertexCore-Quellen des aktuellen PR-Heads kompilieren,
+- führt anschließend den zugehörigen JUnit-Gate-Test aus,
+- schlägt fail-closed fehl, sobald eine von NexusVault verwendete VertexCore-Signatur nicht mehr source-kompatibel ist,
+- schreibt weder in das NexusVault-Repository noch in externe dauerhafte Zustände.
+
+Aktueller Snapshot für den Plattform-Slice #44:
+
+```text
+Tebrox-Development/NexusVault dev
+412becf44e6de104cfb0804f7735ff012516c0cb
+```
+
+Der Snapshot wurde für die Gate-Pflege ausschließlich read-only über GitHub gelesen. Wenn sich NexusVault-`dev` oder dessen VertexCore-Nutzung ändert, muss der Contract gegen den dann aktuellen `dev`-SHA read-only aktualisiert werden. Das Gate ersetzt bewusst keinen späteren NexusVault-Paper-/BentoBox-Migrationslauf und verändert NexusVault nicht.
+
+Bei relevanten API-Änderungen muss der PR zusätzlich dokumentieren:
 
 - welche öffentliche API betroffen ist,
 - ob NexusVault diese API verwendet,
 - warum die Änderung source-/binary-kompatibel bleibt oder welcher Übergangsadapter vorhanden ist.
-
-Cross-Project-Tests mit NexusVault werden als eigenes Infrastruktur-Gate aufgebaut; bis dahin darf fehlende Cross-Project-CI nicht als Begründung für absichtliche API-Breaks dienen.
 
 ## Testangaben in PRs
 
