@@ -46,7 +46,7 @@ final class NexusVaultConsumerCompatibilityTest {
     @SuppressWarnings({"unused", "ConstantConditions"})
     private static void compileCurrentNexusVaultUsage(
             Plugin owner,
-            DatabaseSettings settings,
+            NexusVaultSettings settings,
             Executor ioExecutor,
             NexusVaultRecord record) {
 
@@ -59,6 +59,9 @@ final class NexusVaultConsumerCompatibilityTest {
         DatabaseBackend backend = api.backendFor(owner, settings);
         JsonCodec json = api.json();
         Executor asyncExecutor = api.asyncExecutor();
+        Executor mainExecutor = api.mainExecutor();
+        backend.warmup();
+        api.closeFor(owner);
 
         String encoded = json.toJson(NexusVaultRecord.class, record);
         NexusVaultRecord decoded = json.fromJson(NexusVaultRecord.class, encoded);
@@ -104,12 +107,23 @@ final class NexusVaultConsumerCompatibilityTest {
 
         // Keep local variables observably connected so static analyzers do not
         // mistake the contract calls for accidental dead code.
-        if (loaded == decoded && ioExecutor == asyncExecutor && raw == null
+        if (loaded == decoded && ioExecutor == asyncExecutor && mainExecutor == asyncExecutor && raw == null
                 && returnedOperationId == operationId && result == completion
                 && reconciliation.isDone() && notCommitted.status() == status
                 && isReconciled && reconciliationCause == cause) {
             throw new AssertionError("compile-only compatibility contract");
         }
+    }
+
+    /** Mirrors NexusVaultDatabaseSettings' direct DatabaseSettings implementation. */
+    record NexusVaultSettings(
+            String backend,
+            long timeoutMillis,
+            int poolSize,
+            String mysqlUrl,
+            String mysqlUser,
+            String mysqlPassword,
+            String tablePrefix) implements DatabaseSettings {
     }
 
     static final class NexusVaultRecord implements DataObject {
