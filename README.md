@@ -41,12 +41,25 @@ reducing duplicated boilerplate across multiple plugins.
 
 ---
 
-## Requirements
+## Requirements & Compatibility
 
-- Paper 26.2
-- Java 25+
+VertexCore 1.1.x is built as **Java 21 bytecode** and compiled against the **Paper 1.21.4 API**.
 
-The current development line is compiled against the pinned stable Paper API build `26.2.build.121-stable`.
+Verified runtime compatibility:
+
+| Paper | Java | Status |
+| --- | --- | --- |
+| 1.21.4 | 21 | Verified |
+| 26.2 | 25 | Verified |
+
+The same VertexCore JAR is used for both runtime checks.
+
+- **Minimum Java for VertexCore:** Java 21
+- **Minimum supported Paper baseline:** Paper 1.21.4
+- Newer Paper versions may require a newer Java runtime independently of VertexCore. For example, the verified Paper 26.2 runtime uses Java 25.
+- VertexCore 1.x remains compatibility-oriented; public API compatibility is preserved where possible.
+
+The compatibility matrix is exercised by GitHub Actions using reproducible runtime smoke tests on both supported endpoints.
 
 ---
 
@@ -92,6 +105,18 @@ dependencies {
     <scope>provided</scope>
 </dependency>
 ```
+
+---
+
+## Development Line
+
+The current `development` branch targets `1.1.0-SNAPSHOT`.
+
+Its build baseline is:
+
+- Java release target: `21`
+- Paper compile API: `1.21.4-R0.1-SNAPSHOT`
+- Runtime compatibility gates: Paper `1.21.4` / Java `21` and Paper `26.2` / Java `25`
 
 ---
 
