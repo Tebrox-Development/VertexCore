@@ -17,7 +17,7 @@ permissions:
 jobs:
   verify:
     name: Java 21 / Maven Verify
-    runs-on: [self-hosted, Linux, X64, vertexcore]
+    runs-on: [self-hosted, Linux, X64, vertexcore, resource-heavy]
     timeout-minutes: 15
 
     steps:
