@@ -1,8 +1,6 @@
 name: Paper Runtime Compatibility
 
 on:
-  push:
-    branches: [development]
   pull_request:
     branches: [development]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -11,14 +9,10 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: paper-runtime-compatibility
-  cancel-in-progress: true
-
 jobs:
   changes:
     name: Classify runtime changes
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, Linux, X64, vertexcore]
     outputs:
       relevant: ${{ steps.classify.outputs.relevant }}
     steps:
@@ -55,7 +49,7 @@ jobs:
     name: Paper ${{ matrix.paper }} / Java ${{ matrix.java }}
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, Linux, X64, vertexcore, resource-heavy]
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -64,11 +58,9 @@ jobs:
           - paper: '1.21.4'
             build: '232'
             java: '21'
-            allow-prerelease: 'false'
-          - paper: '26.3'
-            build: 'latest-available'
+          - paper: '26.2'
+            build: '121'
             java: '25'
-            allow-prerelease: 'true'
 
     steps:
       - name: Checkout
@@ -88,5 +80,4 @@ jobs:
         env:
           PAPER_VERSION: ${{ matrix.paper }}
           PAPER_BUILD: ${{ matrix.build }}
-          PAPER_ALLOW_PRERELEASE: ${{ matrix.allow-prerelease }}
         run: bash scripts/runtime-smoke.sh

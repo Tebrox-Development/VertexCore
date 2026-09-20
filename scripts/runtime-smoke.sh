@@ -2,9 +2,7 @@
 set -euo pipefail
 
 PAPER_VERSION="${PAPER_VERSION:-26.2}"
-PAPER_BUILD="${PAPER_BUILD:-latest-stable}"
-PAPER_ALLOW_PRERELEASE="${PAPER_ALLOW_PRERELEASE:-false}"
-SERVER_READY_TIMEOUT_SECONDS="${SERVER_READY_TIMEOUT_SECONDS:-300}"
+PAPER_BUILD="${PAPER_BUILD:-121}"
 USER_AGENT="VertexCore-runtime-smoke/1.0 (https://github.com/Tebrox-Development/VertexCore)"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="${ROOT_DIR}/target/runtime-smoke-${PAPER_VERSION}-${PAPER_BUILD}"
@@ -12,7 +10,7 @@ SERVER_DIR="${RUNTIME_DIR}/server"
 LOG_FILE="${SERVER_DIR}/logs/latest.log"
 BUILD_JSON="${RUNTIME_DIR}/paper-builds.json"
 PROJECT_VERSION="$(mvn -B -ntp help:evaluate -Dexpression=project.version -q -DforceStdout)"
-PLUGIN_JAR="${PLUGIN_JAR:-${ROOT_DIR}/target/vertexCore-${PROJECT_VERSION}.jar}"
+PLUGIN_JAR="${ROOT_DIR}/target/vertexCore-${PROJECT_VERSION}.jar"
 
 rm -rf "${RUNTIME_DIR}"
 mkdir -p "${SERVER_DIR}/plugins"
@@ -27,41 +25,26 @@ curl --fail --silent --show-error --location \
   "https://fill.papermc.io/v3/projects/paper/versions/${PAPER_VERSION}/builds" \
   --output "${BUILD_JSON}"
 
-read -r RESOLVED_PAPER_BUILD RESOLVED_PAPER_CHANNEL PAPER_URL < <(python3 - "${BUILD_JSON}" "${PAPER_BUILD}" "${PAPER_ALLOW_PRERELEASE}" <<'PY'
+PAPER_URL="$(python3 - "${BUILD_JSON}" "${PAPER_BUILD}" <<'PY'
 import json
 import sys
 
-path, selector, allow_prerelease = sys.argv[1], sys.argv[2], sys.argv[3].lower() == "true"
+path, build_id = sys.argv[1], int(sys.argv[2])
 with open(path, encoding="utf-8") as handle:
     builds = json.load(handle)
 
-if selector == "latest-stable":
-    stable = [entry for entry in builds if entry.get("channel") == "STABLE"]
-    if not stable:
-        raise SystemExit("No STABLE Paper build found")
-    build = max(stable, key=lambda entry: int(entry["id"]))
-elif selector == "latest-available":
-    if not builds:
-        raise SystemExit("No Paper builds found")
-    build = max(builds, key=lambda entry: int(entry["id"]))
-else:
-    build_id = int(selector)
-    build = next((entry for entry in builds if entry.get("id") == build_id), None)
-    if build is None:
-        raise SystemExit(f"Pinned Paper build {build_id} not found")
-channel = build.get("channel")
-if channel != "STABLE" and not allow_prerelease:
-    raise SystemExit(f"Paper build {build['id']} is {channel}, not STABLE")
+build = next((entry for entry in builds if entry.get("id") == build_id), None)
+if build is None:
+    raise SystemExit(f"Pinned Paper build {build_id} not found")
+if build.get("channel") != "STABLE":
+    raise SystemExit(f"Pinned Paper build {build_id} is not STABLE")
 
 download = build.get("downloads", {}).get("server:default")
 if not download or not download.get("url"):
-    raise SystemExit(f"Paper build {build['id']} has no server:default download")
-
-print(f"{build['id']}\t{channel}\t{download['url']}")
+    raise SystemExit(f"Pinned Paper build {build_id} has no server:default download")
+print(download["url"])
 PY
-)
-
-echo "Using Paper ${PAPER_VERSION} build ${RESOLVED_PAPER_BUILD} [${RESOLVED_PAPER_CHANNEL}] (selector: ${PAPER_BUILD})"
+)"
 
 curl --fail --silent --show-error --location \
   --header "User-Agent: ${USER_AGENT}" \
@@ -91,7 +74,7 @@ cleanup() {
 trap cleanup EXIT
 
 READY=0
-for _ in $(seq 1 "${SERVER_READY_TIMEOUT_SECONDS}"); do
+for _ in $(seq 1 120); do
   if ! kill -0 "${SERVER_PID}" 2>/dev/null; then
     echo "Paper exited before reaching ready state" >&2
     cat "${SERVER_DIR}/server-console.log" >&2 || true
@@ -106,7 +89,7 @@ for _ in $(seq 1 "${SERVER_READY_TIMEOUT_SECONDS}"); do
 done
 
 if [[ "${READY}" -ne 1 ]]; then
-  echo "Timed out waiting for Paper ${PAPER_VERSION} build ${RESOLVED_PAPER_BUILD} and VertexCore to become ready" >&2
+  echo "Timed out waiting for Paper ${PAPER_VERSION} build ${PAPER_BUILD} and VertexCore to become ready" >&2
   cat "${SERVER_DIR}/server-console.log" >&2 || true
   exit 1
 fi
@@ -144,4 +127,4 @@ if grep -Eiq '(Error occurred while disabling VertexCore|Exception.*VertexCore)'
   exit 1
 fi
 
-echo "Paper ${PAPER_VERSION} build ${RESOLVED_PAPER_BUILD} runtime smoke passed."
+echo "Paper ${PAPER_VERSION} build ${PAPER_BUILD} runtime smoke passed."
