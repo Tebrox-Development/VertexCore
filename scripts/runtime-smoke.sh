@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PAPER_VERSION="${PAPER_VERSION:-26.2}"
-PAPER_BUILD="${PAPER_BUILD:-121}"
+PAPER_BUILD="${PAPER_BUILD:-latest-stable}"
 USER_AGENT="VertexCore-runtime-smoke/1.0 (https://github.com/Tebrox-Development/VertexCore)"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="${ROOT_DIR}/target/runtime-smoke-${PAPER_VERSION}-${PAPER_BUILD}"
@@ -10,7 +10,7 @@ SERVER_DIR="${RUNTIME_DIR}/server"
 LOG_FILE="${SERVER_DIR}/logs/latest.log"
 BUILD_JSON="${RUNTIME_DIR}/paper-builds.json"
 PROJECT_VERSION="$(mvn -B -ntp help:evaluate -Dexpression=project.version -q -DforceStdout)"
-PLUGIN_JAR="${ROOT_DIR}/target/vertexCore-${PROJECT_VERSION}.jar"
+PLUGIN_JAR="${PLUGIN_JAR:-${ROOT_DIR}/target/vertexCore-${PROJECT_VERSION}.jar}"
 
 rm -rf "${RUNTIME_DIR}"
 mkdir -p "${SERVER_DIR}/plugins"
@@ -25,26 +25,36 @@ curl --fail --silent --show-error --location \
   "https://fill.papermc.io/v3/projects/paper/versions/${PAPER_VERSION}/builds" \
   --output "${BUILD_JSON}"
 
-PAPER_URL="$(python3 - "${BUILD_JSON}" "${PAPER_BUILD}" <<'PY'
+read -r RESOLVED_PAPER_BUILD PAPER_URL < <(python3 - "${BUILD_JSON}" "${PAPER_BUILD}" <<'PY'
 import json
 import sys
 
-path, build_id = sys.argv[1], int(sys.argv[2])
+path, selector = sys.argv[1], sys.argv[2]
 with open(path, encoding="utf-8") as handle:
     builds = json.load(handle)
 
-build = next((entry for entry in builds if entry.get("id") == build_id), None)
-if build is None:
-    raise SystemExit(f"Pinned Paper build {build_id} not found")
-if build.get("channel") != "STABLE":
-    raise SystemExit(f"Pinned Paper build {build_id} is not STABLE")
+if selector == "latest-stable":
+    stable = [entry for entry in builds if entry.get("channel") == "STABLE"]
+    if not stable:
+        raise SystemExit("No STABLE Paper build found")
+    build = max(stable, key=lambda entry: int(entry["id"]))
+else:
+    build_id = int(selector)
+    build = next((entry for entry in builds if entry.get("id") == build_id), None)
+    if build is None:
+        raise SystemExit(f"Pinned Paper build {build_id} not found")
+    if build.get("channel") != "STABLE":
+        raise SystemExit(f"Pinned Paper build {build_id} is not STABLE")
 
 download = build.get("downloads", {}).get("server:default")
 if not download or not download.get("url"):
-    raise SystemExit(f"Pinned Paper build {build_id} has no server:default download")
-print(download["url"])
+    raise SystemExit(f"Paper build {build['id']} has no server:default download")
+
+print(f"{build['id']}\t{download['url']}")
 PY
-)"
+)
+
+echo "Using Paper ${PAPER_VERSION} build ${RESOLVED_PAPER_BUILD} (selector: ${PAPER_BUILD})"
 
 curl --fail --silent --show-error --location \
   --header "User-Agent: ${USER_AGENT}" \
@@ -89,7 +99,7 @@ for _ in $(seq 1 120); do
 done
 
 if [[ "${READY}" -ne 1 ]]; then
-  echo "Timed out waiting for Paper ${PAPER_VERSION} build ${PAPER_BUILD} and VertexCore to become ready" >&2
+  echo "Timed out waiting for Paper ${PAPER_VERSION} build ${RESOLVED_PAPER_BUILD} and VertexCore to become ready" >&2
   cat "${SERVER_DIR}/server-console.log" >&2 || true
   exit 1
 fi
@@ -127,4 +137,4 @@ if grep -Eiq '(Error occurred while disabling VertexCore|Exception.*VertexCore)'
   exit 1
 fi
 
-echo "Paper ${PAPER_VERSION} build ${PAPER_BUILD} runtime smoke passed."
+echo "Paper ${PAPER_VERSION} build ${RESOLVED_PAPER_BUILD} runtime smoke passed."
