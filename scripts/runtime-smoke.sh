@@ -4,6 +4,7 @@ set -euo pipefail
 PAPER_VERSION="${PAPER_VERSION:-26.2}"
 PAPER_BUILD="${PAPER_BUILD:-latest-stable}"
 PAPER_ALLOW_PRERELEASE="${PAPER_ALLOW_PRERELEASE:-false}"
+SERVER_READY_TIMEOUT_SECONDS="${SERVER_READY_TIMEOUT_SECONDS:-300}"
 USER_AGENT="VertexCore-runtime-smoke/1.0 (https://github.com/Tebrox-Development/VertexCore)"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="${ROOT_DIR}/target/runtime-smoke-${PAPER_VERSION}-${PAPER_BUILD}"
@@ -90,7 +91,7 @@ cleanup() {
 trap cleanup EXIT
 
 READY=0
-for _ in $(seq 1 120); do
+for _ in $(seq 1 "${SERVER_READY_TIMEOUT_SECONDS}"); do
   if ! kill -0 "${SERVER_PID}" 2>/dev/null; then
     echo "Paper exited before reaching ready state" >&2
     cat "${SERVER_DIR}/server-console.log" >&2 || true
