@@ -60,9 +60,11 @@ jobs:
           - paper: '1.21.4'
             build: '232'
             java: '21'
+            allow-prerelease: 'false'
           - paper: '26.3'
-            build: 'latest-stable'
+            build: 'latest-available'
             java: '25'
+            allow-prerelease: 'true'
 
     steps:
       - name: Checkout
@@ -82,4 +84,5 @@ jobs:
         env:
           PAPER_VERSION: ${{ matrix.paper }}
           PAPER_BUILD: ${{ matrix.build }}
+          PAPER_ALLOW_PRERELEASE: ${{ matrix.allow-prerelease }}
         run: bash scripts/runtime-smoke.sh
