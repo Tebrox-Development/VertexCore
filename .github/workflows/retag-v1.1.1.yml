@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   retag:
-    runs-on: [self-hosted, Linux, X64, vertexcore]
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - name: Move v1.1.1 to stable source
         env:
