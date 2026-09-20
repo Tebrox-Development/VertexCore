@@ -28,15 +28,22 @@ jobs:
           distribution: temurin
           java-version: '25'
 
-      - name: Download released VertexCore 1.1.1
+      - name: Download and verify released VertexCore 1.1.1
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p target/release-under-test
+          BASE_URL="https://github.com/Tebrox-Development/VertexCore/releases/download/v1.1.1"
           curl --fail --silent --show-error --location \
-            "https://github.com/Tebrox-Development/VertexCore/releases/download/v1.1.1/vertexCore-1.1.1.jar" \
+            "${BASE_URL}/vertexCore-1.1.1.jar" \
             --output target/release-under-test/vertexCore-1.1.1.jar
-          test -s target/release-under-test/vertexCore-1.1.1.jar
+          curl --fail --silent --show-error --location \
+            "${BASE_URL}/vertexCore-1.1.1.jar.sha256" \
+            --output target/release-under-test/vertexCore-1.1.1.jar.sha256
+          (
+            cd target/release-under-test
+            sha256sum -c vertexCore-1.1.1.jar.sha256
+          )
 
       - name: Runtime smoke
         env:
