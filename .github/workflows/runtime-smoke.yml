@@ -60,8 +60,8 @@ jobs:
           - paper: '1.21.4'
             build: '232'
             java: '21'
-          - paper: '26.2'
-            build: '121'
+          - paper: '26.3'
+            build: 'latest-stable'
             java: '25'
 
     steps:
