@@ -49,7 +49,7 @@ jobs:
     name: Paper ${{ matrix.paper }} / Java ${{ matrix.java }}
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
-    runs-on: [self-hosted, Linux, X64, vertexcore]
+    runs-on: [self-hosted, Linux, X64, vertexcore, resource-heavy]
     timeout-minutes: 20
     strategy:
       fail-fast: false
