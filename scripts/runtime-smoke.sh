@@ -11,8 +11,10 @@ RUNTIME_DIR="${ROOT_DIR}/target/runtime-smoke-${PAPER_VERSION}-${PAPER_BUILD}"
 SERVER_DIR="${RUNTIME_DIR}/server"
 LOG_FILE="${SERVER_DIR}/logs/latest.log"
 BUILD_JSON="${RUNTIME_DIR}/paper-builds.json"
-PROJECT_VERSION="$(mvn -B -ntp help:evaluate -Dexpression=project.version -q -DforceStdout)"
-PLUGIN_JAR="${PLUGIN_JAR:-${ROOT_DIR}/target/vertexCore-${PROJECT_VERSION}.jar}"
+if [[ -z "${PLUGIN_JAR:-}" ]]; then
+  PROJECT_VERSION="$(mvn -B -ntp help:evaluate -Dexpression=project.version -q -DforceStdout)"
+  PLUGIN_JAR="${ROOT_DIR}/target/vertexCore-${PROJECT_VERSION}.jar"
+fi
 
 rm -rf "${RUNTIME_DIR}"
 mkdir -p "${SERVER_DIR}/plugins"
