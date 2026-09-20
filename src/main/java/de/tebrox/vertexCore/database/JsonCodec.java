@@ -9,7 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class JsonCodec {
-    private final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+    private final Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
 
     public <T> String toJson(Class<T> type, T obj) {
         try {
