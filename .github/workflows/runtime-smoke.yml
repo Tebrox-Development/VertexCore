@@ -1,6 +1,8 @@
 name: Paper Runtime Compatibility
 
 on:
+  push:
+    branches: [development]
   pull_request:
     branches: [development]
     types: [opened, synchronize, reopened, ready_for_review]
