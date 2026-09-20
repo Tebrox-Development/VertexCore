@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: paper-runtime-compatibility
+  cancel-in-progress: true
+
 jobs:
   changes:
     name: Classify runtime changes
