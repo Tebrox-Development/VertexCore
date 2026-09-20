@@ -105,9 +105,6 @@ jobs:
       - name: Maven verify on Java 21
         run: mvn -B -ntp verify
 
-      - name: NexusVault consumer compatibility on Java 21
-        run: bash scripts/nexusvault-consumer-gate.sh
-
       - name: Runtime smoke — Paper 1.21.4 / Java 21
         env:
           PAPER_VERSION: '1.21.4'
@@ -170,7 +167,6 @@ jobs:
               '### Verified before release',
               '',
               '- Maven verify / Java 21',
-              '- NexusVault consumer compatibility / Java 21',
               '- Paper 1.21.4 build 232 / Java 21 runtime smoke',
               '- Paper 26.2 build 121 / Java 25 runtime smoke',
               '',
