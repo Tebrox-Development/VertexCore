@@ -1,6 +1,8 @@
 name: Paper Runtime Compatibility
 
 on:
+  push:
+    branches: [development]
   pull_request:
     branches: [development]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -12,7 +14,7 @@ permissions:
 jobs:
   changes:
     name: Classify runtime changes
-    runs-on: [self-hosted, Linux, X64, vertexcore]
+    runs-on: [self-hosted, Linux, X64]
     outputs:
       relevant: ${{ steps.classify.outputs.relevant }}
     steps:
@@ -49,7 +51,7 @@ jobs:
     name: Paper ${{ matrix.paper }} / Java ${{ matrix.java }}
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
-    runs-on: [self-hosted, Linux, X64, vertexcore, resource-heavy]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 20
     strategy:
       fail-fast: false
