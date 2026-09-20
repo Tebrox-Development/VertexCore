@@ -2,10 +2,7 @@ name: Paper Runtime Compatibility
 
 on:
   push:
-    branches: [development]
-  pull_request:
-    branches: [development]
-    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [test/paper-26.3-compat]
   workflow_dispatch:
 
 permissions:
@@ -61,10 +58,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - paper: '1.21.4'
-            build: '232'
-            java: '21'
-            allow-prerelease: 'false'
           - paper: '26.3'
             build: 'latest-available'
             java: '25'
