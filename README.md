@@ -43,7 +43,7 @@ reducing duplicated boilerplate across multiple plugins.
 
 ## Requirements & Compatibility
 
-VertexCore 1.1.x is built as **Java 21 bytecode** and compiled against the **Paper 1.21.4 API**.
+The current stable VertexCore 1.1.x line is built as **Java 21 bytecode** and compiled against the **Paper 1.21.4 API**.
 
 Verified runtime compatibility:
 
@@ -86,7 +86,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.github.Tebrox-Development:VertexCore:v1.1.0")
+    compileOnly("com.github.Tebrox-Development:VertexCore:v1.1.1")
 }
 ```
 
@@ -101,7 +101,7 @@ dependencies {
 <dependency>
     <groupId>com.github.Tebrox-Development</groupId>
     <artifactId>VertexCore</artifactId>
-    <version>v1.1.0</version>
+    <version>v1.1.1</version>
     <scope>provided</scope>
 </dependency>
 ```
@@ -110,9 +110,9 @@ dependencies {
 
 ## Development Line
 
-The current `development` branch targets `1.1.0-SNAPSHOT`.
+The current `development` branch targets `1.2.0-SNAPSHOT`.
 
-Its build baseline is:
+Its current build baseline is:
 
 - Java release target: `21`
 - Paper compile API: `1.21.4-R0.1-SNAPSHOT`
