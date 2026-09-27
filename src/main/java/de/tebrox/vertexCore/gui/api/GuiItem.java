@@ -40,7 +40,7 @@ public final class GuiItem {
     }
 
     public ItemStack render(GuiRenderContext context) {
-        Objects.requireNonNull(context, "contex");
+        Objects.requireNonNull(context, "context");
         ItemStack rendered;
 
         if(renderer != null) {

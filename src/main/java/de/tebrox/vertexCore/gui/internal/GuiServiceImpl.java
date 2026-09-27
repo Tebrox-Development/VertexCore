@@ -5,12 +5,14 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import java.util.*;
@@ -132,7 +134,15 @@ public final class GuiServiceImpl implements GuiService, Listener {
         Inventory top = event.getView().getTopInventory();
         if(!(top.getHolder() instanceof GuiHolder holder)) return;
 
-        event.setCancelled(true);
+        boolean clickedTop = event.getClickedInventory() == top;
+        if(!clickedTop && event.getAction() == InventoryAction.COLLECT_TO_CURSOR) {
+            collectToCursorFromPlayerInventory(event);
+            return;
+        }
+
+        if(GuiInteractionRules.shouldCancelClick(clickedTop, event.getAction())) event.setCancelled(true);
+
+        if(!clickedTop) return;
 
         if(!(event.getWhoClicked() instanceof Player player)) return;
         GuiSessionImpl session = sessions.get(player.getUniqueId());
@@ -160,9 +170,10 @@ public final class GuiServiceImpl implements GuiService, Listener {
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
-        if(!isVertexGui(event.getView().getTopInventory())) return;
+        Inventory top = event.getView().getTopInventory();
+        if(!isVertexGui(top)) return;
 
-        event.setCancelled(true);
+        if(GuiInteractionRules.shouldCancelDrag(event.getRawSlots(), top.getSize())) event.setCancelled(true);
     }
 
     @EventHandler
@@ -231,5 +242,46 @@ public final class GuiServiceImpl implements GuiService, Listener {
 
         GuiRenderContext context = new GuiRenderContext(viewer, session, slot);
         inventory.setItem(slot, guiItem.render(context));
+    }
+
+    private void collectToCursorFromPlayerInventory(InventoryClickEvent event) {
+        event.setCancelled(true);
+        ItemStack cursor = event.getView().getCursor();
+        if(cursor == null || cursor.getType().isAir()) return;
+
+        int maxStackSize = cursor.getMaxStackSize();
+        int remainingSpace = maxStackSize - cursor.getAmount();
+        if(remainingSpace <= 0) return;
+
+        Inventory bottom = event.getView().getBottomInventory();
+        ItemStack[] contents = bottom.getStorageContents();
+        int collected = 0;
+
+        for(int slot = 0; slot < contents.length; slot++) {
+            ItemStack stack = contents[slot];
+            if(stack == null || stack.getType().isAir() || !stack.isSimilar(cursor)) continue;
+
+            int amountToMove = Math.min(remainingSpace - collected, stack.getAmount());
+            if(amountToMove <= 0) break;
+
+            if(amountToMove == stack.getAmount()) {
+                contents[slot] = null;
+            }else{
+                ItemStack remaining = stack.clone();
+                remaining.setAmount(stack.getAmount() - amountToMove);
+
+                contents[slot] = remaining;
+            }
+
+            collected += amountToMove;
+            if(collected >= remainingSpace) break;
+        }
+
+        if(collected == 0) return;
+
+        bottom.setStorageContents(contents);
+        ItemStack updatedCursor = cursor.clone();
+        updatedCursor.setAmount(cursor.getAmount() + collected);
+        event.getView().setCursor(updatedCursor);
     }
 }
