@@ -56,7 +56,7 @@ public final class VertexCoreApi {
         return db.json();
     }
 
-    public DatabaseBackend backendFor(org.bukkit.plugin.Plugin owner, DatabaseSettings settings) {
+    public DatabaseBackend backendFor(Plugin owner, DatabaseSettings settings) {
         return db.backendFor(owner, settings);
     }
 
@@ -64,7 +64,7 @@ public final class VertexCoreApi {
         return db.queueFor(owner, timeoutMillis);
     }
 
-    public void closeFor(org.bukkit.plugin.Plugin owner) {
+    public void closeFor(Plugin owner) {
         db.closeFor(owner);
     }
 

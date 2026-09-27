@@ -20,6 +20,7 @@ import java.util.logging.Level;
 
 public final class GuiServiceImpl implements GuiService, Listener {
     private final Map<UUID, GuiSessionImpl> sessions = new HashMap<>();
+    private final GuiLayoutLoader layoutLoader = new GuiLayoutLoader();
 
     @Override
     public GuiSession open(Plugin owner, Player viewer, GuiDefinition definition) {
@@ -165,6 +166,18 @@ public final class GuiServiceImpl implements GuiService, Listener {
         viewer.openInventory(newInventory);
 
         return true;
+    }
+
+    @Override
+    public GuiLayout loadLayout(Plugin owner, String relativePath) {
+        Objects.requireNonNull(owner, "owner");
+
+        return layoutLoader.load(owner, relativePath);
+    }
+
+    @Override
+    public GuiTemplate loadTemplate(Plugin owner, String relativePath) {
+        return null;
     }
 
     @Override

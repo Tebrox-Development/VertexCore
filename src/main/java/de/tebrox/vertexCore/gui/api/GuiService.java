@@ -25,5 +25,9 @@ public interface GuiService {
 
     boolean back(Player viewer);
 
+    GuiLayout loadLayout(Plugin owner, String relativePath);
+
+    GuiTemplate loadTemplate(Plugin owner, String relativePath);
+
     void shutdown();
 }
