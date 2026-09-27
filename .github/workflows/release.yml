@@ -4,14 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: Stable version to build and release (for example 1.1.0)
+        description: Stable version to build and release (for example 1.2.0)
         required: true
-        default: '1.1.0'
         type: string
       source_ref:
-        description: Source branch, tag or commit to release
+        description: Stable source branch, tag or commit to release
         required: true
-        default: development
+        default: master
         type: string
       draft:
         description: Create the GitHub release as a draft
@@ -48,7 +47,7 @@ jobs:
           SHORT_SHA="${TARGET_SHA:0:8}"
           echo "target_sha=${TARGET_SHA}" >> "${GITHUB_OUTPUT}"
           echo "short_sha=${SHORT_SHA}" >> "${GITHUB_OUTPUT}"
-          echo "Releasing source ${TARGET_SHA}"
+          echo "Releasing stable source ${TARGET_SHA}"
 
       - name: Set up Java 21
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
@@ -57,7 +56,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Prepare stable project version
+      - name: Validate stable project version
         id: version
         shell: bash
         env:
@@ -71,31 +70,10 @@ jobs:
           fi
 
           CURRENT_VERSION="$(mvn -B -ntp help:evaluate -Dexpression=project.version -q -DforceStdout)"
-          EXPECTED_SNAPSHOT="${RELEASE_VERSION}-SNAPSHOT"
-
-          if [[ "${CURRENT_VERSION}" != "${EXPECTED_SNAPSHOT}" && "${CURRENT_VERSION}" != "${RELEASE_VERSION}" ]]; then
-            echo "Source version ${CURRENT_VERSION} does not match ${EXPECTED_SNAPSHOT} or ${RELEASE_VERSION}" >&2
-            exit 1
-          fi
 
           if [[ "${CURRENT_VERSION}" != "${RELEASE_VERSION}" ]]; then
-            python3 - "${CURRENT_VERSION}" "${RELEASE_VERSION}" <<'PY'
-          from pathlib import Path
-          import sys
-
-          old, new = sys.argv[1], sys.argv[2]
-          path = Path('pom.xml')
-          text = path.read_text(encoding='utf-8')
-          needle = f'<version>{old}</version>'
-          if needle not in text:
-              raise SystemExit(f'Project version {old} not found in pom.xml')
-          path.write_text(text.replace(needle, f'<version>{new}</version>', 1), encoding='utf-8')
-          PY
-          fi
-
-          EFFECTIVE_VERSION="$(mvn -B -ntp help:evaluate -Dexpression=project.version -q -DforceStdout)"
-          if [[ "${EFFECTIVE_VERSION}" != "${RELEASE_VERSION}" ]]; then
-            echo "Failed to prepare stable version: ${EFFECTIVE_VERSION}" >&2
+            echo "Stable source version ${CURRENT_VERSION} does not match requested release ${RELEASE_VERSION}" >&2
+            echo "Merge the finalized release version into master before running this workflow." >&2
             exit 1
           fi
 
@@ -162,7 +140,7 @@ jobs:
             const fs = require('fs');
 
             const body = [
-              `Stable VertexCore ${process.env.VERSION} release artifact built from development source ${process.env.TARGET_SHA}.`,
+              `Stable VertexCore ${process.env.VERSION} release artifact built from stable source ${process.env.TARGET_SHA}.`,
               '',
               '### Verified before release',
               '',
