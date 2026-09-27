@@ -13,6 +13,10 @@ public interface GuiService {
 
     boolean isOpen(Player viewer);
 
+    boolean refresh(Player viewer);
+
+    boolean refresh(Player viewer, int slot);
+
     void close(Player viewer);
 
     void closeFor(Plugin owner);

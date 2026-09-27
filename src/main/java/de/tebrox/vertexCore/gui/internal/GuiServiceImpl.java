@@ -13,7 +13,6 @@ import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.Plugin;
 
-import java.io.ObjectStreamException;
 import java.util.*;
 import java.util.logging.Level;
 
@@ -36,14 +35,11 @@ public final class GuiServiceImpl implements GuiService, Listener {
         Inventory inventory = Bukkit.createInventory(holder, definition.size(), definition.title());
         holder.attachInventory(inventory);
 
-        for(Map.Entry<Integer, GuiItem> entry : definition.items().entrySet()) {
-            inventory.setItem(entry.getKey(), entry.getValue().item());
-        }
-
         GuiSessionImpl session = new GuiSessionImpl(sessionId, owner, viewer.getUniqueId(), definition, inventory);
         sessions.put(viewer.getUniqueId(), session);
 
         try {
+            renderAll(viewer, session);
             viewer.openInventory(inventory);
         }catch(RuntimeException exception) {
             sessions.remove(viewer.getUniqueId(), session);
@@ -65,6 +61,33 @@ public final class GuiServiceImpl implements GuiService, Listener {
         GuiSessionImpl session = sessions.get(viewer.getUniqueId());
 
         return session != null && isViewing(viewer, session);
+    }
+
+    @Override
+    public boolean refresh(Player viewer) {
+        requireMainThread();
+
+        Objects.requireNonNull(viewer, "viewer");
+        GuiSessionImpl session = sessions.get(viewer.getUniqueId());
+
+        if(session == null || !isViewing(viewer, session)) return false;
+
+        renderAll(viewer, session);
+        return true;
+    }
+
+    @Override
+    public boolean refresh(Player viewer, int slot) {
+        requireMainThread();
+
+        Objects.requireNonNull(viewer, "viewer");
+        GuiSessionImpl session = sessions.get(viewer.getUniqueId());
+
+        if(session == null || !isViewing(viewer, session)) return false;
+        if(slot < 0 || slot >= session.definition().size()) throw new IllegalArgumentException("GUI slot " + slot + " is outside inventory size "+  session.definition().size());
+
+        renderSlot(viewer, session, slot);
+        return true;
     }
 
     @Override
@@ -189,5 +212,24 @@ public final class GuiServiceImpl implements GuiService, Listener {
         if(!Bukkit.isPrimaryThread()) {
             throw new IllegalStateException("GUI operations must run on the server main thread");
         }
+    }
+
+    private void renderAll(Player viewer, GuiSessionImpl session) {
+        Inventory inventory = session.inventory();
+        inventory.clear();
+
+        for(Integer slot : session.definition().items().keySet()) renderSlot(viewer, session, slot);
+    }
+
+    private void renderSlot(Player viewer, GuiSessionImpl session, int slot) {
+        Inventory inventory = session.inventory();
+        GuiItem guiItem = session.definition().item(slot).orElse(null);
+        if(guiItem == null) {
+            inventory.setItem(slot, null);
+            return;
+        }
+
+        GuiRenderContext context = new GuiRenderContext(viewer, session, slot);
+        inventory.setItem(slot, guiItem.render(context));
     }
 }

@@ -44,7 +44,7 @@ public final class GuiDefinition {
     public static final class Builder {
         private int rows = 3;
         private Component title = Component.empty();
-        private final Map<Integer, GuiItem> items = new LinkedHashMap<>();
+        private final List<SlotOperation> operations = new ArrayList<>();
 
         private Builder() {}
 
@@ -62,7 +62,14 @@ public final class GuiDefinition {
 
         public Builder set(int slot, GuiItem item) {
             if(slot < 0) throw new IllegalArgumentException("GUI slot must not be negative");
-            items.put(slot, Objects.requireNonNull(item, "item"));
+
+            Objects.requireNonNull(item, "item");
+            operations.add((rows, items) -> {
+               int size = rows * 9;
+               if(slot >= size) throw new IllegalStateException("GUI slot " + slot + " is outside inventory size " + size);
+
+               items.put(slot, item);
+            });
 
             return this;
         }
@@ -75,13 +82,83 @@ public final class GuiDefinition {
             return set(slot, GuiItem.button(item, clickHandler));
         }
 
+        public Builder setAll(GuiItem item, int... slots) {
+            Objects.requireNonNull(item, "item");
+            Objects.requireNonNull(slots, "slots");
+
+            for(int slot : slots) {
+                set(slot, item);
+            }
+
+            return this;
+        }
+
+        public Builder setAll(ItemStack item, int... slots) {
+            return setAll(GuiItem.of(item), slots);
+        }
+
+        public Builder fill(GuiItem item) {
+            Objects.requireNonNull(item, "item");
+
+            operations.add((rows, items) -> {
+               int size = rows * 9;
+               for(int slot = 0; slot < size; slot++) {
+                   items.put(slot, item);
+               }
+            });
+
+            return this;
+        }
+
+        public Builder fill(ItemStack item) {
+            return fill(GuiItem.of(item));
+        }
+
+        public Builder border(GuiItem item) {
+            Objects.requireNonNull(item, "item");
+
+            operations.add((rows, items) -> {
+                int size = rows * 9;
+
+                for(int slot = 0; slot < 9; slot++) {
+                    items.put(slot, item);
+                }
+
+                if(rows > 1) {
+                    int bottomStart = size - 9;
+                    for(int slot = bottomStart; slot < size; slot++) {
+                        items.put(slot, item);
+                    }
+                }
+
+                for(int row = 1; row < rows -1; row++) {
+                    int rowStart = row * 9;
+
+                    items.put(rowStart, item);
+                    items.put(rowStart + 8, item);
+                }
+            });
+
+            return this;
+        }
+
+        public Builder border(ItemStack item) {
+            return border(GuiItem.of(item));
+        }
+
         public GuiDefinition build() {
-            int size = rows * 9;
-            for(Integer slot : items.keySet()) {
-                if(slot >= size) throw new IllegalStateException("GUI slot " + slot + " is outside inventory size " + size);
+            Map<Integer, GuiItem> items = new LinkedHashMap<>();
+
+            for(SlotOperation operation : operations) {
+                operation.apply(rows, items);
             }
 
             return new GuiDefinition(rows, title, items);
+        }
+
+        @FunctionalInterface
+        private interface SlotOperation {
+            void apply(int rows, Map<Integer, GuiItem> items);
         }
     }
 }
