@@ -89,7 +89,7 @@ final class GuiLayoutLoader {
         }
     }
 
-    private String normalizedPath(String relativePath) {
+    String normalizedPath(String relativePath) {
         if(relativePath.isBlank()) throw new IllegalArgumentException("GUI layout path must not be blank");
 
         Path path = Path.of(relativePath).normalize();

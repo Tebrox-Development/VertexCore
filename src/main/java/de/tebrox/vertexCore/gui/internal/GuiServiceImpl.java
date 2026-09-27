@@ -21,6 +21,7 @@ import java.util.logging.Level;
 public final class GuiServiceImpl implements GuiService, Listener {
     private final Map<UUID, GuiSessionImpl> sessions = new HashMap<>();
     private final GuiLayoutLoader layoutLoader = new GuiLayoutLoader();
+    private final GuiTemplateLoader templateLoader = new GuiTemplateLoader();
 
     @Override
     public GuiSession open(Plugin owner, Player viewer, GuiDefinition definition) {
@@ -177,7 +178,8 @@ public final class GuiServiceImpl implements GuiService, Listener {
 
     @Override
     public GuiTemplate loadTemplate(Plugin owner, String relativePath) {
-        return null;
+        Objects.requireNonNull(owner, "owner");
+        return templateLoader.load(owner, relativePath);
     }
 
     @Override

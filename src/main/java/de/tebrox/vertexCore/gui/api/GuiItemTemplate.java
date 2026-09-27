@@ -14,8 +14,8 @@ public final class GuiItemTemplate {
 
     public GuiItemTemplate(Material material, int amount, GuiText name, List<GuiText> lore) {
         this.material = Objects.requireNonNull(material, "material");
-        if(material.isAir()) throw new IllegalArgumentException("GUI template material must not be air");
-        if(amount < 1 || amount > material.getMaxStackSize()) throw new IllegalArgumentException("GUI template amount " + amount + " is invalid for " + material);
+        if (material == Material.AIR || material == Material.CAVE_AIR || material == Material.VOID_AIR) throw new IllegalArgumentException("GUI template material must not be air");
+        if(amount < 1 || amount > 64) throw new IllegalArgumentException("GUI template amount " + amount + " is invalid for " + material);
 
         this.amount = amount;
         this.name = name;
