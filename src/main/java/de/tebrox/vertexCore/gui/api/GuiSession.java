@@ -12,4 +12,8 @@ public interface GuiSession {
     UUID viewerId();
 
     GuiDefinition definition();
+
+    int pageIndex();
+
+    int pageCount();
 }

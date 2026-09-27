@@ -1,6 +1,7 @@
 package de.tebrox.vertexCore.gui.internal;
 
 import de.tebrox.vertexCore.gui.api.GuiDefinition;
+import de.tebrox.vertexCore.gui.api.GuiPagination;
 import de.tebrox.vertexCore.gui.api.GuiService;
 import de.tebrox.vertexCore.gui.api.GuiSession;
 import org.bukkit.entity.Player;
@@ -17,6 +18,7 @@ final class GuiSessionImpl implements GuiSession {
     private final UUID viewerId;
     private final GuiDefinition definition;
     private final Inventory inventory;
+    private int pageIndex;
 
     GuiSessionImpl(UUID id, Plugin owner, UUID viewerId, GuiDefinition definition, Inventory inventory) {
         this.id = Objects.requireNonNull(id, "id");
@@ -24,6 +26,7 @@ final class GuiSessionImpl implements GuiSession {
         this.viewerId = Objects.requireNonNull(viewerId, "viewerId");
         this.definition = Objects.requireNonNull(definition, "definition");
         this.inventory = Objects.requireNonNull(inventory, "inventory");
+        this.pageIndex = 0;
     }
 
     @Override
@@ -46,7 +49,22 @@ final class GuiSessionImpl implements GuiSession {
         return definition;
     }
 
+    @Override
+    public int pageIndex() {
+        return pageIndex;
+    }
+
+    @Override
+    public int pageCount() {
+        return definition.pagination().map(GuiPagination::pageCount).orElse(1);
+    }
+
     Inventory inventory() {
         return inventory;
+    }
+
+    void pageIndex(int pageIndex) {
+        if(pageIndex < 0 || pageIndex >= pageCount()) throw new IllegalArgumentException("Page index " + pageIndex + " is outside page count " + pageCount());
+        this.pageIndex = pageIndex;
     }
 }

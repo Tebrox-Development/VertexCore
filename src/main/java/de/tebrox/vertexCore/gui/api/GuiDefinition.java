@@ -9,12 +9,14 @@ import java.util.*;
 public final class GuiDefinition {
     private final int rows;
     private final Component title;
+    private final GuiPagination pagination;
     private final Map<Integer, GuiItem> items;
 
-    public GuiDefinition(int rows, Component title, Map<Integer, GuiItem> items) {
+    public GuiDefinition(int rows, Component title, Map<Integer, GuiItem> items, GuiPagination pagination) {
         this.rows = rows;
         this.title = Objects.requireNonNull(title, "title");
         this.items = Collections.unmodifiableMap(new LinkedHashMap<>(items));
+        this.pagination = pagination;
     }
 
     public static Builder builder() {
@@ -41,9 +43,14 @@ public final class GuiDefinition {
         return items;
     }
 
+    public Optional<GuiPagination> pagination() {
+        return Optional.ofNullable(pagination);
+    }
+
     public static final class Builder {
         private int rows = 3;
         private Component title = Component.empty();
+        private GuiPagination pagination;
         private final List<SlotOperation> operations = new ArrayList<>();
 
         private Builder() {}
@@ -146,6 +153,11 @@ public final class GuiDefinition {
             return border(GuiItem.of(item));
         }
 
+        public Builder pagination(GuiPagination pagination) {
+            this.pagination = Objects.requireNonNull(pagination, "pagination");
+            return this;
+        }
+
         public GuiDefinition build() {
             Map<Integer, GuiItem> items = new LinkedHashMap<>();
 
@@ -153,7 +165,9 @@ public final class GuiDefinition {
                 operation.apply(rows, items);
             }
 
-            return new GuiDefinition(rows, title, items);
+            if(pagination != null) pagination.validateForSize(rows * 9);
+
+            return new GuiDefinition(rows, title, items, pagination);
         }
 
         @FunctionalInterface

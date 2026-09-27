@@ -153,7 +153,22 @@ public final class GuiServiceImpl implements GuiService, Listener {
         int rawSlot = event.getRawSlot();
         if(rawSlot < 0 || rawSlot >= top.getSize()) return;
 
-        GuiItem item = session.definition().item(rawSlot).orElse(null);
+        GuiPagination pagination = session.definition().pagination().orElse(null);
+        if(pagination != null) {
+            if(pagination.isPreviousSlot(rawSlot) && pagination.hasPrevious(session.pageIndex())) {
+                session.pageIndex(session.pageIndex() - 1);
+                renderPagination(player, session);
+                return;
+            }
+
+            if(pagination.isNextSlot(rawSlot) && pagination.hasNext(session.pageIndex())) {
+                session.pageIndex(session.pageIndex() + 1);
+                renderPagination(player, session);
+                return;
+            }
+        }
+
+        GuiItem item = resolveDisplayedItem(session, rawSlot);
         if(item == null) return;
 
         item.clickHandler().ifPresent(handler -> {
@@ -229,12 +244,15 @@ public final class GuiServiceImpl implements GuiService, Listener {
         Inventory inventory = session.inventory();
         inventory.clear();
 
-        for(Integer slot : session.definition().items().keySet()) renderSlot(viewer, session, slot);
+        Set<Integer> slots = new LinkedHashSet<>(session.definition().items().keySet());
+        session.definition().pagination().ifPresent(pagination -> slots.addAll(pagination.managedSlots()));
+
+        for(int slot : slots) renderSlot(viewer, session, slot);
     }
 
     private void renderSlot(Player viewer, GuiSessionImpl session, int slot) {
         Inventory inventory = session.inventory();
-        GuiItem guiItem = session.definition().item(slot).orElse(null);
+        GuiItem guiItem = resolveDisplayedItem(session, slot);
         if(guiItem == null) {
             inventory.setItem(slot, null);
             return;
@@ -242,6 +260,31 @@ public final class GuiServiceImpl implements GuiService, Listener {
 
         GuiRenderContext context = new GuiRenderContext(viewer, session, slot);
         inventory.setItem(slot, guiItem.render(context));
+    }
+
+    private GuiItem resolveDisplayedItem(GuiSessionImpl session, int slot) {
+        GuiDefinition definition = session.definition();
+        GuiPagination pagination = definition.pagination().orElse(null);
+        if(pagination != null) {
+            if(pagination.isContentSlot(slot)) {
+                GuiItem pageItem = pagination.item(session.pageIndex(), slot).orElse(null);
+                if(pageItem != null) return pageItem;
+            }
+
+            if(pagination.isPreviousSlot(slot) && pagination.hasPrevious(session.pageIndex())) return pagination.previousItem().orElse(null);
+            if(pagination.isNextSlot(slot) && pagination.hasNext(session.pageIndex())) return pagination.nextItem().orElse(null);
+        }
+
+        return definition.item(slot).orElse(null);
+    }
+
+    private void renderPagination(Player viewer, GuiSessionImpl session) {
+        GuiPagination pagination = session.definition().pagination().orElse(null);
+        if(pagination == null) return;
+
+        for(int slot : pagination.managedSlots()) {
+            renderSlot(viewer, session, slot);
+        }
     }
 
     private void collectToCursorFromPlayerInventory(InventoryClickEvent event) {

@@ -6,6 +6,7 @@ import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -110,6 +111,67 @@ class GuiDefinitionTest {
 
         ItemStack second = item.render(context);
         assertEquals(5, second.getAmount());
+    }
+
+    @Test
+    void paginationCalculatesPagesAndMapsContent() {
+        GuiPagination pagination = GuiPagination.builder()
+                .contentSlots(10, 11)
+                .content(List.of(
+                        GuiItem.of(new TestItemStack(1)),
+                        GuiItem.of(new TestItemStack(2)),
+                        GuiItem.of(new TestItemStack(3)),
+                        GuiItem.of(new TestItemStack(4)),
+                        GuiItem.of(new TestItemStack(5))
+                ))
+                .previous(18, GuiItem.of(new TestItemStack(6)))
+                .next(26, GuiItem.of(new TestItemStack(7)))
+                .build();
+
+        assertEquals(3, pagination.pageCount());
+        assertEquals(1, pagination.item(0, 10).orElseThrow().item().getAmount());
+        assertEquals(2, pagination.item(0, 11).orElseThrow().item().getAmount());
+        assertEquals(3, pagination.item(1, 10).orElseThrow().item().getAmount());
+        assertEquals(5, pagination.item(2, 10).orElseThrow().item().getAmount());
+
+        assertTrue(pagination.item(2, 11).isEmpty());
+        assertFalse(pagination.hasPrevious(0));
+        assertTrue(pagination.hasNext(0));
+        assertTrue(pagination.hasPrevious(2));
+        assertFalse(pagination.hasNext(2));
+    }
+
+    @Test
+    void emptyPaginationStillHasOnePage() {
+        GuiPagination pagination = GuiPagination.builder()
+                .contentSlots(10, 11, 12)
+                .content(List.of())
+                .build();
+
+        assertEquals(1, pagination.pageCount());
+
+        assertFalse(pagination.hasPrevious(0));
+        assertFalse(pagination.hasNext(0));
+    }
+
+    @Test
+    void paginationRejectsDuplicateContentSlots() {
+        assertThrows(IllegalArgumentException.class, () -> GuiPagination.builder().contentSlots(10, 11, 10));
+    }
+
+    @Test
+    void paginationRejectsNavigationSlotCollisions() {
+        GuiItem item = GuiItem.of(new TestItemStack(1));
+
+        assertThrows(IllegalStateException.class, () -> GuiPagination.builder().contentSlots(10, 11).previous(10, item).build());
+        assertThrows(IllegalStateException.class, () -> GuiPagination.builder().contentSlots(10, 11).next(11, item).build());
+        assertThrows(IllegalStateException.class, () -> GuiPagination.builder().contentSlots(10, 11).previous(20, item).next(20, item).build());
+    }
+
+    @Test
+    void guiDefinitionRejectsPaginationSlotsOutsideInventory() {
+        GuiPagination pagination = GuiPagination.builder().contentSlots(9).content(List.of(GuiItem.of(new TestItemStack(1)))).build();
+        assertThrows(IllegalStateException.class, () -> GuiDefinition.builder().rows(1).pagination(pagination).build());
     }
 
     private static Player player() {

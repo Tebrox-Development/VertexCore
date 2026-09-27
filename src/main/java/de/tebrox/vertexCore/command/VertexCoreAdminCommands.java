@@ -8,18 +8,11 @@ import de.tebrox.vertexCore.database.DatabaseBackend;
 import de.tebrox.vertexCore.database.DatabaseSettings;
 import de.tebrox.vertexCore.database.PluginDataRegistry;
 import de.tebrox.vertexCore.database.migration.*;
-import de.tebrox.vertexCore.gui.api.GuiDefinition;
-import de.tebrox.vertexCore.gui.api.GuiItem;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @VAliasConfigSource(
@@ -243,73 +236,5 @@ public final class VertexCoreAdminCommands {
         return options.stream()
                 .filter(o -> o.toLowerCase(Locale.ROOT).startsWith(t))
                 .collect(Collectors.toList());
-    }
-
-    @VSub("vertexcore guitest")
-    public void guiTest(CommandContext ctx) {
-        if (!(ctx.sender() instanceof Player player)) {
-            ctx.reply("Players only.");
-            return;
-        }
-
-        AtomicBoolean enabled = new AtomicBoolean(false);
-
-        GuiItem toggle = GuiItem.button(
-                render -> {
-                    boolean active = enabled.get();
-
-                    ItemStack item = new ItemStack(
-                            active
-                                    ? Material.LIME_DYE
-                                    : Material.GRAY_DYE
-                    );
-
-                    item.editMeta(meta ->
-                            meta.displayName(
-                                    Component.text(
-                                            active
-                                                    ? "Enabled"
-                                                    : "Disabled"
-                                    )
-                            )
-                    );
-
-                    return item;
-                },
-                click -> {
-                    enabled.set(!enabled.get());
-
-                    VertexCoreApi.get()
-                            .gui()
-                            .refresh(
-                                    click.player(),
-                                    click.slot()
-                            );
-                }
-        );
-
-        GuiDefinition gui =
-                GuiDefinition.builder()
-                        .rows(3)
-                        .title(
-                                Component.text(
-                                        "Refresh Test"
-                                )
-                        )
-                        .border(
-                                new ItemStack(
-                                        Material.BLACK_STAINED_GLASS_PANE
-                                )
-                        )
-                        .set(13, toggle)
-                        .build();
-
-        VertexCoreApi.get()
-                .gui()
-                .open(
-                        corePlugin,
-                        player,
-                        gui
-                );
     }
 }
