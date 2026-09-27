@@ -4,6 +4,7 @@ import de.tebrox.vertexCore.command.VertexCoreAdminCommands;
 import de.tebrox.vertexCore.command.internal.CommandServiceImpl;
 import de.tebrox.vertexCore.database.DatabaseService;
 import de.tebrox.vertexCore.database.PluginDataRegistry;
+import de.tebrox.vertexCore.gui.internal.GuiServiceImpl;
 import de.tebrox.vertexCore.language.api.LanguageService;
 import de.tebrox.vertexCore.language.internal.LanguageServiceImpl;
 import de.tebrox.vertexCore.util.Timeouts;
@@ -13,6 +14,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class VertexCore extends JavaPlugin {
 
     private CommandServiceImpl commandService;
+    private GuiServiceImpl guiService;
 
     @Override
     public void onEnable() {
@@ -22,8 +24,10 @@ public final class VertexCore extends JavaPlugin {
         this.commandService = new CommandServiceImpl();
 
         LanguageService languageService = new LanguageServiceImpl();
+        this.guiService = new GuiServiceImpl();
+        getServer().getPluginManager().registerEvents(this.guiService, this);
 
-        VertexCoreApi.init(this, registry, db, this.commandService, languageService);
+        VertexCoreApi.init(this, registry, db, this.commandService, languageService, this.guiService);
 
         this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
             this.commandService.registerInto(event.registrar());
@@ -38,6 +42,7 @@ public final class VertexCore extends JavaPlugin {
     @Override
     public void onDisable() {
         if(this.commandService != null) this.commandService.shutdown();
+        if(this.guiService != null) this.guiService.shutdown();
 
         VertexCoreApi.get().languages().shutdown();
         VertexCoreApi.get().databaseService().closeAll();
