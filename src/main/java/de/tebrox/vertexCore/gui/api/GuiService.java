@@ -21,5 +21,9 @@ public interface GuiService {
 
     void closeFor(Plugin owner);
 
+    boolean navigate(Player viewer, GuiDefinition definition);
+
+    boolean back(Player viewer);
+
     void shutdown();
 }

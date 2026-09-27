@@ -33,9 +33,7 @@ public final class GuiServiceImpl implements GuiService, Listener {
         if(existing != null) closeSession(existing);
 
         UUID sessionId = UUID.randomUUID();
-        GuiHolder holder = new GuiHolder(sessionId);
-        Inventory inventory = Bukkit.createInventory(holder, definition.size(), definition.title());
-        holder.attachInventory(inventory);
+        Inventory inventory = createInventory(sessionId, definition);
 
         GuiSessionImpl session = new GuiSessionImpl(sessionId, owner, viewer.getUniqueId(), definition, inventory);
         sessions.put(viewer.getUniqueId(), session);
@@ -120,6 +118,56 @@ public final class GuiServiceImpl implements GuiService, Listener {
     }
 
     @Override
+    public boolean navigate(Player viewer, GuiDefinition definition) {
+        requireMainThread();
+
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(definition, "definition");
+
+        GuiSessionImpl session = sessions.get(viewer.getUniqueId());
+        if(session == null || !isViewing(viewer, session)) return false;
+
+        Inventory previousInventory = session.inventory();
+        int previousPage = session.pageIndex();
+
+        Inventory newInventory = createInventory(session.id(), definition);
+        session.pushCurrentView();
+        session.switchView(definition, newInventory);
+
+        try {
+            renderAll(viewer, session);
+            viewer.openInventory(newInventory);
+
+            return true;
+        }catch(RuntimeException exception) {
+            session.restorePreviousView(previousInventory);
+            session.pageIndex(previousPage);
+
+            throw exception;
+        }
+    }
+
+    @Override
+    public boolean back(Player viewer) {
+        requireMainThread();
+
+        Objects.requireNonNull(viewer, "viewer");
+
+        GuiSessionImpl session = sessions.get(viewer.getUniqueId());
+        if(session == null || !isViewing(viewer, session) || !session.canGoBack()) return false;
+
+        GuiDefinition previousDefinition = session.previousDefinition();
+        Inventory newInventory = createInventory(session.id(), previousDefinition);
+
+        if(!session.restorePreviousView(newInventory)) return false;
+
+        renderAll(viewer, session);
+        viewer.openInventory(newInventory);
+
+        return true;
+    }
+
+    @Override
     public void shutdown() {
         requireMainThread();
 
@@ -201,6 +249,7 @@ public final class GuiServiceImpl implements GuiService, Listener {
 
         if(current == null) return;
         if(!current.id().equals(holder.sessionId())) return;
+        if(current.inventory() != top) return;
 
         sessions.remove(viewerId, current);
     }
@@ -213,6 +262,14 @@ public final class GuiServiceImpl implements GuiService, Listener {
     @EventHandler
     public void onPluginDisable(PluginDisableEvent event) {
         closeFor(event.getPlugin());
+    }
+
+    private Inventory createInventory(UUID sessionId, GuiDefinition definition) {
+        GuiHolder holder = new GuiHolder(sessionId);
+        Inventory inventory = Bukkit.createInventory(holder, definition.size(), definition.title());
+        holder.attachInventory(inventory);
+
+        return inventory;
     }
 
     private void closeSession(GuiSessionImpl session) {

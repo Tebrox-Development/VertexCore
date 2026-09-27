@@ -16,4 +16,6 @@ public interface GuiSession {
     int pageIndex();
 
     int pageCount();
+
+    boolean canGoBack();
 }
