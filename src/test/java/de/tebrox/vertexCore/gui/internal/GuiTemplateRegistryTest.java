@@ -91,6 +91,43 @@ class GuiTemplateRegistryTest {
         assertTrue(registry.find(second, "settings").isPresent());
     }
 
+    @Test
+    void replaceUpdatesTemplateAndKeepsSourcePath() {
+        GuiTemplateRegistry registry = new GuiTemplateRegistry();
+        Plugin owner = plugin("TestPlugin");
+
+        GuiTemplate first = template("settings");
+        GuiTemplate second = new GuiTemplate("settings", GuiLayout.builder().rows(4).build(), GuiText.literal("Updated"), Map.of());
+
+        registry.register(owner, "gui/settings.yml", first);
+        registry.replace(owner, "settings", second);
+
+        assertSame(second, registry.require(owner, "settings"));
+        assertEquals("gui/settings.yml", registry.relativePath(owner, "settings"));
+    }
+
+    @Test
+    void replaceRejectsChangedTemplateId() {
+        GuiTemplateRegistry registry = new GuiTemplateRegistry();
+        Plugin owner = plugin("TestPlugin");
+
+        GuiTemplate original = template("settings");
+        registry.register(owner, "gui/settings.yml", original);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> registry.replace(owner, "settings", template("different")));
+        assertTrue(exception.getMessage().contains("settings"));
+        assertTrue(exception.getMessage().contains("different"));
+        assertSame(original, registry.require(owner, "settings"));
+    }
+
+    @Test
+    void relativePathRejectsUnknownTemplate() {
+        GuiTemplateRegistry registry = new GuiTemplateRegistry();
+        Plugin owner = plugin("TestPlugin");
+
+        assertThrows(IllegalStateException.class, () -> registry.relativePath(owner, "missing"));
+    }
+
     private static GuiTemplate template(String id) {
         return new GuiTemplate(id, GuiLayout.builder().rows(3).build(), GuiText.literal("Test"), Map.of());
     }

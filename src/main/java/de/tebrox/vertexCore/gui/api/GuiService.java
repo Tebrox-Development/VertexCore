@@ -29,6 +29,8 @@ public interface GuiService {
 
     GuiTemplate loadTemplate(Plugin owner, String relativePath);
 
+    GuiTemplate reloadTemplate(Plugin owner, String id);
+
     GuiTemplate registerTemplate(Plugin owner, String relativePath);
 
     Optional<GuiTemplate> template(Plugin owner, String id);

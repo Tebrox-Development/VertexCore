@@ -200,6 +200,19 @@ public final class GuiServiceImpl implements GuiService, Listener {
     }
 
     @Override
+    public GuiTemplate reloadTemplate(Plugin owner, String id) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(id, "id");
+
+        String relativePath = templates.relativePath(owner, id);
+        GuiTemplate reloaded = templateLoader.load(owner, relativePath);
+
+        templates.replace(owner, id, reloaded);
+
+        return reloaded;
+    }
+
+    @Override
     public GuiTemplate registerTemplate(Plugin owner, String relativePath) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(relativePath, "relativePath");

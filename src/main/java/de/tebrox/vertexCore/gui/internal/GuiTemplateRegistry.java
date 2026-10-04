@@ -37,15 +37,36 @@ final class GuiTemplateRegistry {
     }
 
     GuiTemplate require(Plugin owner, String id) {
+        return requireEntry(owner, id).template();
+    }
+
+    String relativePath(Plugin owner, String id) {
+        return requireEntry(owner, id).relativePath();
+    }
+
+    void replace(Plugin owner, String id, GuiTemplate template) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(template, "template");
+
+        String validatedId = validateId(id);
+        Entry current = requireEntry(owner, validatedId);
+        String reloadedId = template.id().orElseThrow(() -> new IllegalArgumentException("Registered GUI template requires an ID"));
+
+        if(!validatedId.equals(reloadedId)) throw new IllegalStateException("Reloaded GUI template ID changed from '" + validatedId + "' to '" + reloadedId + "'");
+
+        templates.get(owner).put(validatedId, new Entry(current.relativePath, template));
+    }
+
+    private Entry requireEntry(Plugin owner, String id) {
         Objects.requireNonNull(owner, "owner");
 
         String validatedId = validateId(id);
         Map<String, Entry> owned = templates.get(owner);
 
         Entry entry = owned == null ? null : owned.get(validatedId);
-        if(entry == null) throw new IllegalStateException("Unknown GUI template '" + validatedId + "' for plugin "+ owner.getName());
+        if(entry == null) throw new IllegalStateException("Unknown GUI template '" + validatedId + "' for plugin " + owner.getName());
 
-        return entry.template;
+        return entry;
     }
 
     boolean unregister(Plugin owner, String id) {
