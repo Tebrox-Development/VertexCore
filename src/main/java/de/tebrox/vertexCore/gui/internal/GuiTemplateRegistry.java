@@ -36,6 +36,18 @@ final class GuiTemplateRegistry {
         return entry == null ? Optional.empty() : Optional.of(entry.template());
     }
 
+    GuiTemplate require(Plugin owner, String id) {
+        Objects.requireNonNull(owner, "owner");
+
+        String validatedId = validateId(id);
+        Map<String, Entry> owned = templates.get(owner);
+
+        Entry entry = owned == null ? null : owned.get(validatedId);
+        if(entry == null) throw new IllegalStateException("Unknown GUI template '" + validatedId + "' for plugin "+ owner.getName());
+
+        return entry.template;
+    }
+
     boolean unregister(Plugin owner, String id) {
         Objects.requireNonNull(owner, "owner");
 

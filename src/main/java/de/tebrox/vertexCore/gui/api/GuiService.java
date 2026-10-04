@@ -39,6 +39,10 @@ public interface GuiService {
 
     GuiDefinition renderTemplate(Plugin owner, Player viewer, GuiTemplate template);
 
+    GuiSession openTemplate(Plugin owner, Player viewer, String id);
+
+    boolean navigateTemplate(Plugin owner, Player viewer, String id);
+
     void registerAction(Plugin owner, String actionId, GuiClickHandler handler);
 
     boolean unregisterAction(Plugin owner, String actionId);

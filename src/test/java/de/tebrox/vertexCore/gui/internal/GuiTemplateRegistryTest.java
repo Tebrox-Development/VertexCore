@@ -65,6 +65,32 @@ class GuiTemplateRegistryTest {
         assertTrue(registry.find(owner, "rewards").isPresent());
     }
 
+    @Test
+    void requireRejectsUnknownTemplate() {
+        GuiTemplateRegistry registry = new GuiTemplateRegistry();
+        Plugin owner = plugin("TestPlugin");
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> registry.require(owner, "missing"));
+
+        assertTrue(exception.getMessage().contains("missing"));
+        assertTrue(exception.getMessage().contains("TestPlugin"));
+    }
+
+    @Test
+    void unregisterAllOnlyRemovesTemplatesForOwner() {
+        GuiTemplateRegistry registry = new GuiTemplateRegistry();
+
+        Plugin first = plugin("FirstPlugin");
+        Plugin second = plugin("SecondPlugin");
+
+        registry.register(first, "gui/settings.yml", template("settings"));
+        registry.register(second, "gui/settings.yml", template("settings"));
+        registry.unregisterAll(first);
+
+        assertTrue(registry.find(first, "settings").isEmpty());
+        assertTrue(registry.find(second, "settings").isPresent());
+    }
+
     private static GuiTemplate template(String id) {
         return new GuiTemplate(id, GuiLayout.builder().rows(3).build(), GuiText.literal("Test"), Map.of());
     }

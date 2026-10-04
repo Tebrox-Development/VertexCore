@@ -231,6 +231,36 @@ public final class GuiServiceImpl implements GuiService, Listener {
     }
 
     @Override
+    public GuiSession openTemplate(Plugin owner, Player viewer, String id) {
+        requireMainThread();
+
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(viewer, "viewer");
+
+        GuiTemplate template = templates.require(owner, id);
+        GuiDefinition definition = templateRenderer.render(owner, viewer, template);
+
+        return open(owner, viewer, definition);
+    }
+
+    @Override
+    public boolean navigateTemplate(Plugin owner, Player viewer, String id) {
+        requireMainThread();
+
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(viewer, "viewer");
+
+        GuiTemplate template = templates.require(owner, id);
+        GuiSessionImpl session = sessions.get(viewer.getUniqueId());
+
+        if(session == null || session.owner() != owner || !isViewing(viewer, session)) return false;
+
+        GuiDefinition definition = templateRenderer.render(owner, viewer, template);
+
+        return navigate(viewer, definition);
+    }
+
+    @Override
     public void registerAction(Plugin owner, String actionId, GuiClickHandler handler) {
         actions.register(owner, actionId, handler);
     }
