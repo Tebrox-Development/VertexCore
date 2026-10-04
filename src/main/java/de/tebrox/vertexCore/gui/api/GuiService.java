@@ -29,6 +29,14 @@ public interface GuiService {
 
     GuiTemplate loadTemplate(Plugin owner, String relativePath);
 
+    GuiTemplate registerTemplate(Plugin owner, String relativePath);
+
+    Optional<GuiTemplate> template(Plugin owner, String id);
+
+    boolean unregisterTemplate(Plugin owner, String id);
+
+    void unregisterTemplates(Plugin owner);
+
     GuiDefinition renderTemplate(Plugin owner, Player viewer, GuiTemplate template);
 
     void registerAction(Plugin owner, String actionId, GuiClickHandler handler);

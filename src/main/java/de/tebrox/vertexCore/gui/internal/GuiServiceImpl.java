@@ -21,11 +21,15 @@ import java.util.logging.Level;
 
 public final class GuiServiceImpl implements GuiService, Listener {
     private final Map<UUID, GuiSessionImpl> sessions = new HashMap<>();
+
     private final GuiLayoutLoader layoutLoader = new GuiLayoutLoader();
     private final GuiTemplateLoader templateLoader = new GuiTemplateLoader();
+
     private final LanguageService languages;
     private final GuiTemplateRenderer templateRenderer;
+
     private final GuiActionRegistry actions = new GuiActionRegistry();
+    private final GuiTemplateRegistry templates = new GuiTemplateRegistry();
 
     public GuiServiceImpl(LanguageService languages) {
         this.languages = Objects.requireNonNull(languages, "languages");
@@ -196,6 +200,32 @@ public final class GuiServiceImpl implements GuiService, Listener {
     }
 
     @Override
+    public GuiTemplate registerTemplate(Plugin owner, String relativePath) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(relativePath, "relativePath");
+
+        GuiTemplate template = templateLoader.load(owner, relativePath);
+        templates.register(owner, relativePath, template);
+
+        return template;
+    }
+
+    @Override
+    public Optional<GuiTemplate> template(Plugin owner, String id) {
+        return templates.find(owner, id);
+    }
+
+    @Override
+    public boolean unregisterTemplate(Plugin owner, String id) {
+        return templates.unregister(owner, id);
+    }
+
+    @Override
+    public void unregisterTemplates(Plugin owner) {
+        templates.unregisterAll(owner);
+    }
+
+    @Override
     public GuiDefinition renderTemplate(Plugin owner, Player viewer, GuiTemplate template) {
         return templateRenderer.render(owner, viewer, template);
     }
@@ -224,6 +254,7 @@ public final class GuiServiceImpl implements GuiService, Listener {
 
         sessions.clear();
         actions.clear();
+        templates.clear();
     }
 
     @EventHandler
@@ -314,6 +345,7 @@ public final class GuiServiceImpl implements GuiService, Listener {
 
         closeFor(event.getPlugin());
         actions.unregisterAll(owner);
+        templates.unregisterAll(owner);
     }
 
     private Inventory createInventory(UUID sessionId, GuiDefinition definition) {
