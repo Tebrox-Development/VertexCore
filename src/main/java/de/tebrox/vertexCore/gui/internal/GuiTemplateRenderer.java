@@ -36,18 +36,29 @@ final class GuiTemplateRenderer {
         template.id().ifPresent(builder::id);
 
         for(Map.Entry<Integer, GuiItemTemplate> entry : template.items().entrySet()) {
-            GuiItemTemplate itemTemplate = entry.getValue();
-            ItemStack item = renderItem(owner, viewer, itemTemplate);
+            renderItemInto(builder, owner, viewer, entry.getKey(), entry.getValue());
 
-            if(itemTemplate.actionId().isPresent()) {
-                GuiClickHandler handler = actions.require(owner, itemTemplate.actionId().orElseThrow());
-                builder.set(entry.getKey(), item, handler);
-            }else{
-                builder.set(entry.getKey(), item);
-            }
+        }
+
+        for(Map.Entry<String, GuiItemTemplate> entry : template.roleItems().entrySet()) {
+            String role = entry.getKey();
+            int slot = template.layout().requireSlot(role);
+
+            renderItemInto(builder, owner, viewer, slot, entry.getValue());
         }
 
         return builder.build();
+    }
+
+    private void renderItemInto(GuiDefinition.Builder builder, Plugin owner, Player viewer, int slot, GuiItemTemplate itemTemplate) {
+        ItemStack item = renderItem(owner, viewer, itemTemplate);
+
+        if(itemTemplate.actionId().isPresent()) {
+            GuiClickHandler handler = actions.require(owner, itemTemplate.actionId().orElseThrow());
+            builder.set(slot, item, handler);
+        }else{
+            builder.set(slot, item);
+        }
     }
 
     private ItemStack renderItem(Plugin owner, Player viewer, GuiItemTemplate template) {

@@ -209,8 +209,82 @@ class GuiTemplateLoaderTest {
         assertTrue(exception.getMessage().contains("id"));
     }
 
-    private void write(String relativePath, String content) throws IOException {
+    @Test
+    void loadsRoleItems() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                id: test
+                rows: 3
+                title: "Test"
+    
+                roles:
+                  back: 18
+    
+                role-items:
+                  back:
+                    material: ARROW
+                    name: "<yellow>Back"
+                    action: back
+                """
+        );
 
+        GuiTemplate template = new GuiTemplateLoader().load(plugin(), "gui/menu.yml");
+        GuiItemTemplate back = template.roleItem("back").orElseThrow();
+
+        assertEquals(Material.ARROW, back.material());
+        assertEquals("<yellow>Back", back.name().orElseThrow().value());
+        assertEquals("back", back.actionId().orElseThrow());
+    }
+
+    @Test
+    void rejectsRoleItemWithoutLayoutRole() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                id: test
+                rows: 3
+                title: "Test"
+    
+                role-items:
+                  back:
+                    material: ARROW
+                """
+        );
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiTemplateLoader().load(plugin(), "gui/menu.yml"));
+        assertTrue(exception.getMessage().contains("back"));
+        assertTrue(exception.getMessage().contains("undefined"));
+    }
+
+    @Test
+    void rejectsRoleItemConflictingWithStaticItem() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                id: test
+                rows: 3
+                title: "Test"
+    
+                roles:
+                  back: 18
+    
+                items:
+                  18:
+                    material: DIAMOND
+    
+                role-items:
+                  back:
+                    material: ARROW
+                """
+        );
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiTemplateLoader().load(plugin(), "gui/menu.yml"));
+        assertTrue(exception.getMessage().contains("conflicts"));
+        assertTrue(exception.getMessage().contains("18"));
+    }
+
+    private void write(String relativePath, String content) throws IOException {
         Path file = tempDir.resolve(relativePath);
         Files.createDirectories(file.getParent());
         Files.writeString(file, content);
