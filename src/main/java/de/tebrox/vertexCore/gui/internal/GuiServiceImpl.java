@@ -29,6 +29,10 @@ public final class GuiServiceImpl implements GuiService, Listener {
 
     public GuiServiceImpl(LanguageService languages) {
         this.languages = Objects.requireNonNull(languages, "languages");
+
+        actions.registerBuiltIn(GuiActions.CLOSE, context -> close(context.player()));
+        actions.registerBuiltIn(GuiActions.BACK, context -> back(context.player()));
+
         this.templateRenderer = new GuiTemplateRenderer(languages, actions);
     }
 

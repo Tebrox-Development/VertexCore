@@ -61,6 +61,41 @@ class GuiActionRegistryTest {
         assertThrows(IllegalStateException.class, () -> registry.require(owner, "open-settings"));
     }
 
+    @Test
+    void resolvesBuiltInActionForAnyOwner() {
+        GuiActionRegistry registry = new GuiActionRegistry();
+        GuiClickHandler handler = context -> {};
+
+        registry.registerBuiltIn("close", handler);
+
+        assertSame(handler, registry.require(plugin("FirstPlugin"), "close"));
+        assertSame(handler, registry.require(plugin("SecondPlugin"), "close"));
+    }
+
+    @Test
+    void consumerCannotOverrideBuiltInAction() {
+        GuiActionRegistry registry = new GuiActionRegistry();
+
+        registry.registerBuiltIn("close", context -> {});
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> registry.register(plugin("TestPlugin"), "close", context -> {}));
+        assertTrue(exception.getMessage().contains("reserved"));
+    }
+
+    @Test
+    void removingConsumerActionsKeepsBuiltInActions() {
+        GuiActionRegistry registry = new GuiActionRegistry();
+        Plugin owner = plugin("TestPlugin");
+        GuiClickHandler close = context -> {};
+
+        registry.registerBuiltIn("close", close);
+        registry.register(owner, "custom", context -> {});
+        registry.unregisterAll(owner);
+
+        assertSame(close, registry.require(owner, "close"));
+        assertThrows(IllegalStateException.class, () -> registry.require(owner, "custom"));
+    }
+
     private static Plugin plugin(String name) {
         return (Plugin) Proxy.newProxyInstance(Plugin.class.getClassLoader(), new Class<?>[]{Plugin.class},
                         (proxy, method, args) ->

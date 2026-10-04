@@ -26,6 +26,8 @@ public final class GuiItemTemplate {
         this.amount = amount;
         this.name = name;
         this.lore = List.copyOf(Objects.requireNonNull(lore, "lore"));
+
+        if(actionId != null && actionId.isBlank()) throw new IllegalStateException("GUI template action ID must not be blank");
         this.actionId = actionId;
     }
 

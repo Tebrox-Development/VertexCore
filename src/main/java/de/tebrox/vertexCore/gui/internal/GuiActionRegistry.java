@@ -9,6 +9,7 @@ import java.util.Objects;
 
 final class GuiActionRegistry {
     private final Map<Plugin, Map<String, GuiClickHandler>> actions = new HashMap<>();
+    private final Map<String, GuiClickHandler> builtInActions = new HashMap<>();
 
     void register(Plugin owner, String actionId, GuiClickHandler handler) {
         Objects.requireNonNull(owner, "owner");
@@ -16,9 +17,19 @@ final class GuiActionRegistry {
 
         String normalized = validateActionId(actionId);
 
+        if(builtInActions.containsKey(normalized)) throw new IllegalStateException("GUI action '" + normalized + "' is reserved by VertexCore");
+
         Map<String, GuiClickHandler> owned = actions.computeIfAbsent(owner, ignored -> new HashMap<>());
         if(owned.containsKey(normalized)) throw new IllegalStateException("GUI action '" + normalized + "' is already registered for plugin " + owner.getName());
         owned.put(normalized, handler);
+    }
+
+    void registerBuiltIn(String actionId, GuiClickHandler handler) {
+        Objects.requireNonNull(handler, "handler");
+        String normalized = validateActionId(actionId);
+
+        if(builtInActions.containsKey(normalized)) throw new IllegalStateException("Built-In GUI action '" + normalized + "' is already registered");
+        builtInActions.put(normalized, handler);
     }
 
     boolean unregister(Plugin owner, String actionId){
@@ -43,10 +54,13 @@ final class GuiActionRegistry {
         Objects.requireNonNull(owner, "owner");
 
         String normalized = validateActionId(actionId);
-        Map<String, GuiClickHandler> owned = actions.get(owner);
 
+        GuiClickHandler builtIn = builtInActions.get(normalized);
+        if(builtIn != null) return builtIn;
+
+        Map<String, GuiClickHandler> owned = actions.get(owner);
         GuiClickHandler handler = owned == null ? null : owned.get(normalized);
-        if(handler == null) throw new IllegalStateException("Unknows GUI action '" + normalized + "' for plugin " + owner.getName());
+        if(handler == null) throw new IllegalStateException("Unknown GUI action '" + normalized + "' for plugin " + owner.getName());
 
         return handler;
     }
