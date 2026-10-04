@@ -9,12 +9,15 @@ import de.tebrox.vertexCore.language.api.LanguageService;
 import de.tebrox.vertexCore.language.internal.LanguageServiceImpl;
 import de.tebrox.vertexCore.util.Timeouts;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import org.bstats.bukkit.Metrics;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class VertexCore extends JavaPlugin {
 
     private CommandServiceImpl commandService;
     private GuiServiceImpl guiService;
+
+    private static final int BSTATS_PLUGIN_ID = 34499;
 
     @Override
     public void onEnable() {
@@ -34,6 +37,8 @@ public final class VertexCore extends JavaPlugin {
         });
 
         VertexCoreApi.get().commands().register(this, new VertexCoreAdminCommands(this, registry));
+
+        new Metrics(this, BSTATS_PLUGIN_ID);
 
         getLogger().info("VertexCore enabled.");
 

@@ -22,6 +22,7 @@
         <h2.version>2.2.224</h2.version>
         <mysql.version>9.3.0</mysql.version>
         <junit.version>5.11.4</junit.version>
+        <bstats.version>3.2.1</bstats.version>
 
         <maven.compiler.version>3.14.1</maven.compiler.version>
         <maven.surefire.version>3.5.2</maven.surefire.version>
@@ -67,6 +68,12 @@
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.bstats</groupId>
+            <artifactId>bstats-bukkit</artifactId>
+            <version>${bstats.version}</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
 
@@ -119,8 +126,16 @@
                             <include>com.zaxxer:HikariCP</include>
                             <include>com.h2database:h2</include>
                             <include>com.mysql:mysql-connector-j</include>
+                            <include>org.bstats:*</include>
                         </includes>
                     </artifactSet>
+
+                    <relocations>
+                        <relocation>
+                            <pattern>org.bstats</pattern>
+                            <shadedPattern>de.tebrox.vertexCore.lib.bstats</shadedPattern>
+                        </relocation>
+                    </relocations>
 
                     <transformers>
                         <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>

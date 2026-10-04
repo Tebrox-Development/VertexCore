@@ -106,7 +106,7 @@ final class GuiTemplateLoader {
 
         for(String fillerId : section.getKeys(false)) {
             ConfigurationSection fillerSection = section.getConfigurationSection(fillerId);
-            if(fillerId == null) throw error(source, "'fillers." + fillerId + "' must be a YAML section");
+            if(fillerSection == null) throw error(source, "'fillers." + fillerId + "' must be a YAML section");
 
             String path = "fillers." + fillerId;
             List<Integer> slots = readFillerSlots(fillerSection, path, source);
