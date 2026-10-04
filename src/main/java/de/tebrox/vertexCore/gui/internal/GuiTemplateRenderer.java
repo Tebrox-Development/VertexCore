@@ -16,10 +16,13 @@ import java.util.Objects;
 
 final class GuiTemplateRenderer {
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
-    private final LanguageService languages;
 
-    GuiTemplateRenderer(LanguageService languages) {
+    private final LanguageService languages;
+    private final GuiActionRegistry actions;
+
+    GuiTemplateRenderer(LanguageService languages, GuiActionRegistry actions) {
         this.languages = Objects.requireNonNull(languages, "languages");
+        this.actions = Objects.requireNonNull(actions, "actions");
     }
 
     GuiDefinition render(Plugin owner, Player viewer, GuiTemplate template) {
@@ -31,7 +34,15 @@ final class GuiTemplateRenderer {
         GuiDefinition.Builder builder = GuiDefinition.builder().rows(template.layout().rows()).title(title);
 
         for(Map.Entry<Integer, GuiItemTemplate> entry : template.items().entrySet()) {
-            builder.set(entry.getKey(), renderItem(owner, viewer, entry.getValue()));
+            GuiItemTemplate itemTemplate = entry.getValue();
+            ItemStack item = renderItem(owner, viewer, itemTemplate);
+
+            if(itemTemplate.actionId().isPresent()) {
+                GuiClickHandler handler = actions.require(owner, itemTemplate.actionId().orElseThrow());
+                builder.set(entry.getKey(), item, handler);
+            }else{
+                builder.set(entry.getKey(), item);
+            }
         }
 
         return builder.build();

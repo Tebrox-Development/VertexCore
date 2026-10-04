@@ -92,8 +92,16 @@ final class GuiTemplateLoader {
 
         List<GuiText> lore = readLore(section, slotKey, source);
 
+        String actionId = null;
+        if(section.contains("action")) {
+            if(!section.isString("action")) throw error(source, "'items." + slotKey + ".action' must be text");
+
+            actionId = section.getString("action");
+            if(actionId == null || actionId.isBlank()) throw error(source, "'items." + slotKey + ".action' must not be blank");
+        }
+
         try {
-            return new GuiItemTemplate(material, amount, name, lore);
+            return new GuiItemTemplate(material, amount, name, lore, actionId);
         }catch(IllegalArgumentException exception) {
             throw error(source, exception.getMessage(), exception);
         }

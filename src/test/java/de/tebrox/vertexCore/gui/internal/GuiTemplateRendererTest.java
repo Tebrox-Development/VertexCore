@@ -16,7 +16,7 @@ class GuiTemplateRendererTest {
 
     @Test
     void rendersLiteralTextWithMiniMessage() {
-        GuiTemplateRenderer renderer = new GuiTemplateRenderer(languageService(false));
+        GuiTemplateRenderer renderer = new GuiTemplateRenderer(languageService(false), new GuiActionRegistry());
 
         Component result = renderer.renderText(plugin(), player(), GuiText.literal("<gold>Hello"));
         assertEquals(MiniMessage.miniMessage().deserialize("<gold>Hello"), result);
@@ -27,7 +27,7 @@ class GuiTemplateRendererTest {
         Plugin owner = plugin();
         Player viewer = player();
 
-        GuiTemplateRenderer renderer = new GuiTemplateRenderer(languageService(true));
+        GuiTemplateRenderer renderer = new GuiTemplateRenderer(languageService(true), new GuiActionRegistry());
 
         Component result = renderer.renderText(owner, viewer, GuiText.languageKey("gui.test.title"));
         assertEquals(Component.text("Translated gui.test.title"), result);
@@ -37,7 +37,7 @@ class GuiTemplateRendererTest {
     void rejectsLanguageKeyWithoutRegisteredLanguageService() {
         Plugin owner = plugin();
 
-        GuiTemplateRenderer renderer = new GuiTemplateRenderer(languageService(false));
+        GuiTemplateRenderer renderer = new GuiTemplateRenderer(languageService(false), new GuiActionRegistry());
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> renderer.renderText(owner, player(), GuiText.languageKey("gui.test.title")));
 

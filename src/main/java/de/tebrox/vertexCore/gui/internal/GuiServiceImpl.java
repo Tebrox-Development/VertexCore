@@ -25,10 +25,11 @@ public final class GuiServiceImpl implements GuiService, Listener {
     private final GuiTemplateLoader templateLoader = new GuiTemplateLoader();
     private final LanguageService languages;
     private final GuiTemplateRenderer templateRenderer;
+    private final GuiActionRegistry actions = new GuiActionRegistry();
 
     public GuiServiceImpl(LanguageService languages) {
         this.languages = Objects.requireNonNull(languages, "languages");
-        this.templateRenderer = new GuiTemplateRenderer(languages);
+        this.templateRenderer = new GuiTemplateRenderer(languages, actions);
     }
 
     @Override
@@ -196,6 +197,21 @@ public final class GuiServiceImpl implements GuiService, Listener {
     }
 
     @Override
+    public void registerAction(Plugin owner, String actionId, GuiClickHandler handler) {
+        actions.register(owner, actionId, handler);
+    }
+
+    @Override
+    public boolean unregisterAction(Plugin owner, String actionId) {
+        return actions.unregister(owner, actionId);
+    }
+
+    @Override
+    public void unregisterActions(Plugin owner) {
+        actions.unregisterAll(owner);
+    }
+
+    @Override
     public void shutdown() {
         requireMainThread();
 
@@ -203,6 +219,7 @@ public final class GuiServiceImpl implements GuiService, Listener {
         for(GuiSessionImpl session : openSessions) closeSession(session);
 
         sessions.clear();
+        actions.clear();
     }
 
     @EventHandler
@@ -289,7 +306,10 @@ public final class GuiServiceImpl implements GuiService, Listener {
 
     @EventHandler
     public void onPluginDisable(PluginDisableEvent event) {
+        Plugin owner = event.getPlugin();
+
         closeFor(event.getPlugin());
+        actions.unregisterAll(owner);
     }
 
     private Inventory createInventory(UUID sessionId, GuiDefinition definition) {

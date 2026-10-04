@@ -132,6 +132,46 @@ class GuiTemplateLoaderTest {
         assertTrue(exception.getMessage().contains("must be an integer"));
     }
 
+    @Test
+    void loadsItemActionId() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                rows: 3
+                title: "Test"
+    
+                items:
+                  13:
+                    material: DIAMOND
+                    action: open-settings
+                """
+        );
+
+        GuiTemplate template = new GuiTemplateLoader().load(plugin(), "gui/menu.yml");
+        GuiItemTemplate item = template.item(13).orElseThrow();
+
+        assertEquals("open-settings", item.actionId().orElseThrow());
+    }
+
+    @Test
+    void rejectsBlankItemActionId() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                rows: 3
+                title: "Test"
+    
+                items:
+                  13:
+                    material: DIAMOND
+                    action: ""
+                """
+        );
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiTemplateLoader().load(plugin(), "gui/menu.yml"));
+        assertTrue(exception.getMessage().contains("action"));
+    }
+
     private void write(String relativePath, String content) throws IOException {
 
         Path file = tempDir.resolve(relativePath);
