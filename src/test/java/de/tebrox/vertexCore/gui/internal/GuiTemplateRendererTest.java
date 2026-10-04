@@ -1,17 +1,17 @@
 package de.tebrox.vertexCore.gui.internal;
 
-import de.tebrox.vertexCore.gui.api.GuiDefinition;
-import de.tebrox.vertexCore.gui.api.GuiLayout;
-import de.tebrox.vertexCore.gui.api.GuiTemplate;
-import de.tebrox.vertexCore.gui.api.GuiText;
+import de.tebrox.vertexCore.gui.api.*;
 import de.tebrox.vertexCore.language.api.LanguageService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;

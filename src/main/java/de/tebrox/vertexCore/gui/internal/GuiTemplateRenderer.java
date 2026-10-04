@@ -35,10 +35,8 @@ final class GuiTemplateRenderer {
 
         template.id().ifPresent(builder::id);
 
-        for(Map.Entry<Integer, GuiItemTemplate> entry : template.items().entrySet()) {
-            renderItemInto(builder, owner, viewer, entry.getKey(), entry.getValue());
-
-        }
+        for(Map.Entry<Integer, GuiItemTemplate> entry : template.fillers().entrySet()) renderFillerInto(builder, owner, viewer, entry.getKey(), entry.getValue());
+        for(Map.Entry<Integer, GuiItemTemplate> entry : template.items().entrySet()) renderItemInto(builder, owner, viewer, entry.getKey(), entry.getValue());
 
         for(Map.Entry<String, GuiItemTemplate> entry : template.roleItems().entrySet()) {
             String role = entry.getKey();
@@ -61,7 +59,16 @@ final class GuiTemplateRenderer {
         }
     }
 
+    private void renderFillerInto(GuiDefinition.Builder builder, Plugin owner, Player viewer, int slot, GuiItemTemplate itemTemplate) {
+        ItemStack item = renderItem(owner, viewer, itemTemplate, true);
+        builder.set(slot, item);
+    }
+
     private ItemStack renderItem(Plugin owner, Player viewer, GuiItemTemplate template) {
+        return renderItem(owner, viewer, template, false);
+    }
+
+    private ItemStack renderItem(Plugin owner, Player viewer, GuiItemTemplate template, boolean hideTooltip) {
         int maxStackSize = template.material().getMaxStackSize();
         if(template.amount() > maxStackSize) throw new IllegalStateException("GUI template amount " + template.amount() + " exceeds max stack size " + maxStackSize + " for " + template.material());
 
@@ -69,7 +76,12 @@ final class GuiTemplateRenderer {
         ItemMeta meta = item.getItemMeta();
         if(meta == null) throw new IllegalStateException("Material " + template.material() + " does not provide item metadata");
 
-        template.name().ifPresent(name -> meta.displayName(renderText(owner, viewer, name)));
+        if(hideTooltip) {
+            meta.setHideTooltip(true);
+        }else {
+            template.name().ifPresent(name -> meta.displayName(renderText(owner, viewer, name)));
+        }
+
         if(!template.lore().isEmpty()) {
             List<Component> lore = new ArrayList<>(template.lore().size());
             for(GuiText line : template.lore()) {

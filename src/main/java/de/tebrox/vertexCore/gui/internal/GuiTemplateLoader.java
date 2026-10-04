@@ -46,9 +46,10 @@ final class GuiTemplateLoader {
         GuiText title = readText(yaml.get("title"), "title", source);
         Map<Integer, GuiItemTemplate> items = readItems(yaml, source);
         Map<String, GuiItemTemplate> roleItems = readRoleItems(yaml, source);
+        Map<Integer, GuiItemTemplate> fillers = readFillers(yaml, source);
 
         try {
-            return new GuiTemplate(id, layout, title, items, roleItems);
+            return new GuiTemplate(id, layout, title, items, roleItems, fillers);
         }catch(IllegalArgumentException exception) {
             throw error(source, exception.getMessage(), exception);
         }
@@ -93,6 +94,85 @@ final class GuiTemplateLoader {
         }
 
         return roleItems;
+    }
+
+    private Map<Integer, GuiItemTemplate> readFillers(YamlConfiguration yaml, File source) {
+        Map<Integer, GuiItemTemplate> fillers = new LinkedHashMap<>();
+        Map<Integer, String> slotOwners = new HashMap<>();
+        if(!yaml.contains("fillers")) return fillers;
+
+        ConfigurationSection section = yaml.getConfigurationSection("fillers");
+        if(section == null) throw error(source, "'fillers' must be a YAML section");
+
+        for(String fillerId : section.getKeys(false)) {
+            ConfigurationSection fillerSection = section.getConfigurationSection(fillerId);
+            if(fillerId == null) throw error(source, "'fillers." + fillerId + "' must be a YAML section");
+
+            String path = "fillers." + fillerId;
+            List<Integer> slots = readFillerSlots(fillerSection, path, source);
+            GuiItemTemplate item = readItem(fillerSection, path, source);
+
+            for(int slot : slots) {
+                String previous = slotOwners.putIfAbsent(slot, fillerId);
+                if(previous != null) throw error(source, "Filler '" + fillerId + "' conflicts with filler '" + previous + "' at slot " + slot);
+
+                fillers.put(slot, item);
+            }
+        }
+
+        return fillers;
+    }
+
+    private List<Integer> readFillerSlots(ConfigurationSection section, String path, File source) {
+        if(!section.contains("slots")) throw error(source, "'" + path + ".slots' is required");
+        if(!section.isList("slots")) throw error(source, "'" + path + ".slots' must be a list");
+
+        List<?> raw = section.getList("slots");
+        if(raw == null || raw.isEmpty()) throw error(source, "'" + path + ".slots' must not be empty");
+
+        List<Integer> slots = new ArrayList<>();
+        for(int index = 0; index < raw.size(); index++) {
+            Object value = raw.get(index);
+            readFillerSlot(value, path + ".slots[" + index + "]", slots, source);
+        }
+
+        return slots;
+    }
+
+    private void readFillerSlot(Object value, String path, List<Integer> slots, File source) {
+        if(value instanceof Number number) {
+            double decimal = number.doubleValue();
+            int slot = number.intValue();
+
+            if(decimal != slot) throw error(source, "'" + path + "' must be an integer or slot range");
+            slots.add(slot);
+
+            return;
+        }
+
+        if(value instanceof String range) {
+            addFillerSlotRange(range, path, slots, source);
+            return;
+        }
+
+        throw error(source, "'" + path + "' must be an integer or slot range");
+    }
+
+    private void addFillerSlotRange(String value, String path, List<Integer> slots, File source) {
+        String normalized = value.trim();
+        String[] parts = normalized.split("-", -1);
+        if(parts.length != 2) throw error(source, "'" + path + "' must be an integer or slot range like '10-16'");
+
+        int start, end;
+        try{
+            start = Integer.parseInt(parts[0].trim());
+            end = Integer.parseInt(parts[1].trim());
+        } catch (NumberFormatException exception) {
+            throw error(source, "'" + path + "' must be an integer or slot range like '10-16'");
+        }
+
+        if (start > end) throw error(source, "'" + path + "' slot range must start before or at its end");
+        for(int slot = start; slot <= end; slot++) slots.add(slot);
     }
 
     private GuiItemTemplate readItem(ConfigurationSection section, String path, File source) {

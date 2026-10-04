@@ -284,6 +284,88 @@ class GuiTemplateLoaderTest {
         assertTrue(exception.getMessage().contains("18"));
     }
 
+    @Test
+    void loadsFillersWithSlotsAndRanges() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                        id: test
+                        rows: 3
+                        title: "Test"
+                        
+                        fillers:
+                          border:
+                            slots:
+                              - "0-8"
+                              - 9
+                              - 17
+                              - "18-26"
+                            material: GRAY_STAINED_GLASS_PANE
+                            name: " "
+                        """
+        );
+
+        GuiTemplate template = new GuiTemplateLoader().load(plugin(), "gui/menu.yml");
+
+        assertEquals(20, template.fillers().size());
+        assertEquals(Material.GRAY_STAINED_GLASS_PANE, template.fillers().get(0).material());
+        assertEquals(Material.GRAY_STAINED_GLASS_PANE, template.fillers().get(26).material());
+    }
+
+    @Test
+    void rejectsOverlappingFillers() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                id: test
+                rows: 3
+                title: "Test"
+    
+                fillers:
+                  border:
+                    slots:
+                      - "0-8"
+                    material: GRAY_STAINED_GLASS_PANE
+    
+                  corners:
+                    slots:
+                      - 0
+                      - 8
+                    material: BLACK_STAINED_GLASS_PANE
+                """
+        );
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiTemplateLoader().load(plugin(), "gui/menu.yml"));
+
+        assertTrue(exception.getMessage().contains("conflicts"));
+        assertTrue(exception.getMessage().contains("border"));
+        assertTrue(exception.getMessage().contains("corners"));
+    }
+
+    @Test
+    void rejectsFillerWithAction() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                id: test
+                rows: 3
+                title: "Test"
+    
+                fillers:
+                  background:
+                    slots:
+                      - "0-26"
+                    material: GRAY_STAINED_GLASS_PANE
+                    action: close
+                """
+        );
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiTemplateLoader().load(plugin(), "gui/menu.yml"));
+
+        assertTrue(exception.getMessage().contains("filler"));
+        assertTrue(exception.getMessage().contains("action"));
+    }
+
     private void write(String relativePath, String content) throws IOException {
         Path file = tempDir.resolve(relativePath);
         Files.createDirectories(file.getParent());
