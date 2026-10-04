@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -78,7 +79,7 @@ class GuiLayoutLoaderTest {
         );
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiLayoutLoader().load(plugin(), "gui/test.yml"));
-        assertTrue(exception.getMessage().contains("content-slots[1]"));
+        assertTrue(exception.getMessage().contains("content-slots[1]"), exception.getMessage());
     }
 
     @Test
@@ -121,6 +122,65 @@ class GuiLayoutLoaderTest {
     void rejectsPathsOutsidePluginDataFolder() {
         assertThrows(IllegalArgumentException.class, () -> new GuiLayoutLoader().load(plugin(), "../outside.yml"));
         assertThrows(IllegalArgumentException.class, () -> new GuiLayoutLoader().load(plugin(), "../../outside.yml"));
+    }
+
+    @Test
+    void loadsExplicitSlotsAndRanges() throws IOException {
+        write(
+                "gui/storage.yml",
+                """
+                rows: 6
+    
+                content-slots:
+                  - 10
+                  - "11-16"
+                  - "19-25"
+                  - 28
+                """
+        );
+
+        GuiLayout layout = new GuiLayoutLoader().load(plugin(), "gui/storage.yml");
+        assertEquals(List.of(
+                        10,
+                        11, 12, 13, 14, 15, 16,
+                        19, 20, 21, 22, 23, 24, 25,
+                        28), layout.contentSlots());
+    }
+
+    @Test
+    void rejectsDescendingContentSlotRange()
+            throws IOException {
+
+        write(
+                "gui/test.yml",
+                """
+                rows: 3
+    
+                content-slots:
+                  - "16-10"
+                """
+        );
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiLayoutLoader().load(plugin(), "gui/test.yml"));
+        assertTrue(exception.getMessage().contains("content-slots[0]"), exception.getMessage());
+    }
+
+    @Test
+    void rejectsMalformedContentSlotRange()
+            throws IOException {
+
+        write(
+                "gui/test.yml",
+                """
+                rows: 3
+    
+                content-slots:
+                  - "10-nope"
+                """
+        );
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiLayoutLoader().load(plugin(), "gui/test.yml"));
+        assertTrue(exception.getMessage().contains("content-slots[0]"), exception.getMessage());
     }
 
     private void write(String relativePath, String content) throws IOException {

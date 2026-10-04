@@ -9,6 +9,7 @@ import org.bukkit.plugin.Plugin;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -56,19 +57,50 @@ final class GuiLayoutLoader {
         List<?> raw = yaml.getList("content-slots");
         if(raw == null) return;
 
-        int[] slots = new int[raw.size()];
+        List<Integer> slots = new ArrayList<>();
         for(int index = 0; index < raw.size(); index++) {
             Object value = raw.get(index);
-            if(!(value instanceof Number number)) throw error(source, "'content-slots[" + index + "]' must be an integer");
-
-            double decimal = number.doubleValue();
-            int slot = number.intValue();
-
-            if(decimal != slot) throw error(source, "'content-slots[" + index + "]' must be an integer");
-            slots[index] = slot;
+            readContentSlot(value, index, slots, source);
         }
 
-        builder.contentSlots(slots);
+        builder.contentSlots(slots.stream().mapToInt(Integer::intValue).toArray());
+    }
+
+    private void readContentSlot(Object value, int index, List<Integer> slots, File source) {
+        String path = "content-slots[" + index + "]";
+        if(value instanceof Number number) {
+            double decimal = number.doubleValue();
+            int slot = number.intValue();
+            if(decimal != slot) throw error(source, "'" + path + "' must be an integer or slot range");
+
+            slots.add(slot);
+            return;
+        }
+
+        if(value instanceof String range) {
+            addContentSlotRange(range, path, slots, source);
+            return;
+        }
+
+        throw error(source, "'" + path + "' must be an integer or slot range");
+    }
+
+    private void addContentSlotRange(String value, String path, List<Integer> slots, File source) {
+        String normalized = value.trim();
+        String[] parts = normalized.split("-", -1);
+        if(parts.length != 2) throw error(source, "'" + path + "' must be an integer or slot range like '10-16'");
+
+        int start, end;
+        try {
+            start = Integer.parseInt(parts[0].trim());
+            end = Integer.parseInt(parts[1].trim());
+        }catch(NumberFormatException exception) {
+            throw error(source, "'" + path + "' must be an integer or slot range like '10-16'");
+        }
+
+        if(start > end) throw error(source, "'" + path + "' slot range must start before or at its end");
+
+        for(int slot = start; slot <= end; slot++) slots.add(slot);
     }
 
     private void readRoles(YamlConfiguration yaml, GuiLayout.Builder builder, File source) {
