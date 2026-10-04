@@ -1,6 +1,7 @@
 package de.tebrox.vertexCore.gui.internal;
 
 import de.tebrox.vertexCore.gui.api.*;
+import de.tebrox.vertexCore.language.api.LanguageService;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -22,6 +23,13 @@ public final class GuiServiceImpl implements GuiService, Listener {
     private final Map<UUID, GuiSessionImpl> sessions = new HashMap<>();
     private final GuiLayoutLoader layoutLoader = new GuiLayoutLoader();
     private final GuiTemplateLoader templateLoader = new GuiTemplateLoader();
+    private final LanguageService languages;
+    private final GuiTemplateRenderer templateRenderer;
+
+    public GuiServiceImpl(LanguageService languages) {
+        this.languages = Objects.requireNonNull(languages, "languages");
+        this.templateRenderer = new GuiTemplateRenderer(languages);
+    }
 
     @Override
     public GuiSession open(Plugin owner, Player viewer, GuiDefinition definition) {
@@ -180,6 +188,11 @@ public final class GuiServiceImpl implements GuiService, Listener {
     public GuiTemplate loadTemplate(Plugin owner, String relativePath) {
         Objects.requireNonNull(owner, "owner");
         return templateLoader.load(owner, relativePath);
+    }
+
+    @Override
+    public GuiDefinition renderTemplate(Plugin owner, Player viewer, GuiTemplate template) {
+        return templateRenderer.render(owner, viewer, template);
     }
 
     @Override

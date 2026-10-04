@@ -29,5 +29,7 @@ public interface GuiService {
 
     GuiTemplate loadTemplate(Plugin owner, String relativePath);
 
+    GuiDefinition renderTemplate(Plugin owner, Player viewer, GuiTemplate template);
+
     void shutdown();
 }

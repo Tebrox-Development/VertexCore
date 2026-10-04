@@ -24,7 +24,7 @@ public final class VertexCore extends JavaPlugin {
         this.commandService = new CommandServiceImpl();
 
         LanguageService languageService = new LanguageServiceImpl();
-        this.guiService = new GuiServiceImpl();
+        this.guiService = new GuiServiceImpl(languageService);
         getServer().getPluginManager().registerEvents(this.guiService, this);
 
         VertexCoreApi.init(this, registry, db, this.commandService, languageService, this.guiService);
