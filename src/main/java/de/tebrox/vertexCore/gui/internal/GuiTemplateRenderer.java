@@ -33,6 +33,8 @@ final class GuiTemplateRenderer {
         Component title = renderText(owner, viewer, template.title());
         GuiDefinition.Builder builder = GuiDefinition.builder().rows(template.layout().rows()).title(title);
 
+        template.id().ifPresent(builder::id);
+
         for(Map.Entry<Integer, GuiItemTemplate> entry : template.items().entrySet()) {
             GuiItemTemplate itemTemplate = entry.getValue();
             ItemStack item = renderItem(owner, viewer, itemTemplate);

@@ -3,11 +3,19 @@ package de.tebrox.vertexCore.gui.api;
 import java.util.*;
 
 public final class GuiTemplate {
+    private final String id;
     private final GuiLayout layout;
     private final GuiText title;
     private final Map<Integer, GuiItemTemplate> items;
 
     public GuiTemplate(GuiLayout layout, GuiText title, Map<Integer, GuiItemTemplate> items) {
+        this(null, layout, title, items);
+    }
+
+    public GuiTemplate(String id, GuiLayout layout, GuiText title, Map<Integer, GuiItemTemplate> items) {
+        if(id != null && id.isBlank()) throw new IllegalStateException("GUI template ID must not be blank");
+        this.id = id;
+
         this.layout = Objects.requireNonNull(layout, "layout");
         this.title = Objects.requireNonNull(title, "title");
         Objects.requireNonNull(items, "items");
@@ -20,6 +28,10 @@ public final class GuiTemplate {
         }
 
         this.items = Collections.unmodifiableMap(copy);
+    }
+
+    public Optional<String> id() {
+        return Optional.ofNullable(id);
     }
 
     public GuiLayout layout() {

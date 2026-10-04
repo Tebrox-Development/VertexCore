@@ -25,6 +25,7 @@ class GuiTemplateLoaderTest {
         write(
                 "gui/menu.yml",
                 """
+                id: menu
                 rows: 3
                 title: "<gold>Example Menu"
 
@@ -48,6 +49,7 @@ class GuiTemplateLoaderTest {
         );
 
         GuiTemplate template = new GuiTemplateLoader().load(plugin(), "gui/menu.yml");
+        assertEquals("menu", template.id().orElseThrow());
         assertEquals(3, template.layout().rows());
         assertEquals(18, template.layout().requireSlot("back"));
         assertEquals(GuiText.Type.LITERAL, template.title().type());
@@ -66,6 +68,7 @@ class GuiTemplateLoaderTest {
         write(
                 "gui/menu.yml",
                 """
+                id: test
                 rows: 3
 
                 title:
@@ -83,6 +86,7 @@ class GuiTemplateLoaderTest {
         write(
                 "gui/menu.yml",
                 """
+                id: test
                 rows: 3
                 title: "Test"
 
@@ -101,6 +105,7 @@ class GuiTemplateLoaderTest {
         write(
                 "gui/menu.yml",
                 """
+                id: test
                 rows: 1
                 title: "Test"
 
@@ -119,6 +124,7 @@ class GuiTemplateLoaderTest {
         write(
                 "gui/menu.yml",
                 """
+                id: test
                 rows: 3
                 title: "Test"
 
@@ -137,6 +143,7 @@ class GuiTemplateLoaderTest {
         write(
                 "gui/menu.yml",
                 """
+                id: test
                 rows: 3
                 title: "Test"
     
@@ -158,6 +165,7 @@ class GuiTemplateLoaderTest {
         write(
                 "gui/menu.yml",
                 """
+                id: test
                 rows: 3
                 title: "Test"
     
@@ -170,6 +178,35 @@ class GuiTemplateLoaderTest {
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiTemplateLoader().load(plugin(), "gui/menu.yml"));
         assertTrue(exception.getMessage().contains("action"));
+    }
+
+    @Test
+    void rejectsMissingGuiId() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                rows: 3
+                title: "Test"
+                """
+        );
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiTemplateLoader().load(plugin(), "gui/menu.yml"));
+        assertTrue(exception.getMessage().contains("id"));
+    }
+
+    @Test
+    void rejectsBlankGuiId() throws IOException {
+        write(
+                "gui/menu.yml",
+                """
+                id: ""
+                rows: 3
+                title: "Test"
+                """
+        );
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new GuiTemplateLoader().load(plugin(), "gui/menu.yml"));
+        assertTrue(exception.getMessage().contains("id"));
     }
 
     private void write(String relativePath, String content) throws IOException {

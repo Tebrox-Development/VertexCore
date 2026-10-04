@@ -37,6 +37,12 @@ final class GuiTemplateLoader {
     }
 
     GuiTemplate parse(YamlConfiguration yaml, File source) {
+        if(!yaml.contains("id")) throw error(source, "Missing required field 'id'");
+        if(!yaml.isString("id")) throw error(source, "'id' must be text");
+
+        String id = yaml.getString("id");
+        if(id == null || id.isBlank()) throw error(source, "'id' must not be blank");
+
         GuiLayout layout = layoutLoader.parse(yaml, source);
 
         if(!yaml.contains("title")) throw error(source, "Missing required field 'title'");
@@ -44,7 +50,7 @@ final class GuiTemplateLoader {
         Map<Integer, GuiItemTemplate> items = readItems(yaml, source);
 
         try {
-            return new GuiTemplate(layout, title, items);
+            return new GuiTemplate(id, layout, title, items);
         }catch(IllegalArgumentException exception) {
             throw error(source, exception.getMessage(), exception);
         }

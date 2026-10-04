@@ -7,20 +7,32 @@ import org.bukkit.inventory.ItemStack;
 import java.util.*;
 
 public final class GuiDefinition {
+    private final String id;
     private final int rows;
     private final Component title;
     private final GuiPagination pagination;
     private final Map<Integer, GuiItem> items;
 
-    public GuiDefinition(int rows, Component title, Map<Integer, GuiItem> items, GuiPagination pagination) {
+    public GuiDefinition(String id, int rows, Component title, Map<Integer, GuiItem> items, GuiPagination pagination) {
+        if(id != null && id.isBlank()) throw new IllegalStateException("GUI ID must not be blank");
+        this.id = id;
+
         this.rows = rows;
         this.title = Objects.requireNonNull(title, "title");
         this.items = Collections.unmodifiableMap(new LinkedHashMap<>(items));
         this.pagination = pagination;
     }
 
+    public GuiDefinition(int rows, Component title, Map<Integer, GuiItem> items, GuiPagination pagination) {
+        this(null, rows, title, items, pagination);
+    }
+
     public static Builder builder() {
         return new Builder();
+    }
+
+    public Optional<String> id() {
+        return Optional.ofNullable(id);
     }
 
     public int rows() {
@@ -48,12 +60,21 @@ public final class GuiDefinition {
     }
 
     public static final class Builder {
+        private String id;
         private int rows = 3;
         private Component title = Component.empty();
         private GuiPagination pagination;
         private final List<SlotOperation> operations = new ArrayList<>();
 
         private Builder() {}
+
+        public Builder id(String id) {
+            Objects.requireNonNull(id, "id");
+            if(id.isBlank()) throw new IllegalArgumentException("GUI ID must not be blank");
+
+            this.id = id;
+            return this;
+        }
 
         public Builder rows(int rows) {
             if(rows < 1 || rows > 6) throw new IllegalArgumentException("GUI rows must be between 1 and 6");
@@ -167,7 +188,7 @@ public final class GuiDefinition {
 
             if(pagination != null) pagination.validateForSize(rows * 9);
 
-            return new GuiDefinition(rows, title, items, pagination);
+            return new GuiDefinition(id, rows, title, items, pagination);
         }
 
         @FunctionalInterface

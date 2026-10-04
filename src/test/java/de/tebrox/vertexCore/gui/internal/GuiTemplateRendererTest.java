@@ -1,5 +1,8 @@
 package de.tebrox.vertexCore.gui.internal;
 
+import de.tebrox.vertexCore.gui.api.GuiDefinition;
+import de.tebrox.vertexCore.gui.api.GuiLayout;
+import de.tebrox.vertexCore.gui.api.GuiTemplate;
 import de.tebrox.vertexCore.gui.api.GuiText;
 import de.tebrox.vertexCore.language.api.LanguageService;
 import net.kyori.adventure.text.Component;
@@ -9,6 +12,7 @@ import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -43,6 +47,15 @@ class GuiTemplateRendererTest {
 
         assertTrue(exception.getMessage().contains("gui.test.title"));
         assertTrue(exception.getMessage().contains("TestPlugin"));
+    }
+
+    @Test
+    void propagatesTemplateIdToDefinition() {
+        GuiTemplateRenderer renderer = new GuiTemplateRenderer(languageService(false), new GuiActionRegistry());
+        GuiTemplate template = new GuiTemplate("settings", GuiLayout.builder().rows(3).build(), GuiText.literal("Settings"), Map.of());
+        GuiDefinition definition = renderer.render(plugin(), player(), template);
+
+        assertEquals("settings", definition.id().orElseThrow());
     }
 
     private static LanguageService languageService(boolean registered) {
